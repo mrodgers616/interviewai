@@ -11,6 +11,7 @@ import {
   NavigationMenuTrigger,
 } from "@/components/ui/navigation-menu";
 import { MenuIcon } from "lucide-react";
+import { ScanTextIcon } from "lucide-react";
 
 export const NavbarMobile = () => {
   return (
@@ -23,22 +24,11 @@ export const NavbarMobile = () => {
             </NavigationMenuTrigger>
             <NavigationMenuContent className="flex flex-col p-1">
               <NavigationMenuLink
-                href="#1"
+                href="/"
                 className={buttonVariants({ variant: "link" })}
               >
-                Item 1
-              </NavigationMenuLink>
-              <NavigationMenuLink
-                href="#2"
-                className={buttonVariants({ variant: "link" })}
-              >
-                Item 2
-              </NavigationMenuLink>
-              <NavigationMenuLink
-                href="#3"
-                className={buttonVariants({ variant: "link" })}
-              >
-                Item 3
+                <ScanTextIcon className="w-8 h-8 mr-2 inline" />{" "}
+                InterviewAI
               </NavigationMenuLink>
               <div className="flex flex-col mb-0.5">
                 <NavbarUserLinks />
