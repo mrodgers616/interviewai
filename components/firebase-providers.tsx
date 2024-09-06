@@ -9,10 +9,12 @@ import {
   useFirebaseApp,
 } from "reactfire";
 import { getAuth } from "firebase/auth";
-import { getFirestore } from "firebase/firestore";
+import { getFirestore, doc, setDoc, updateDoc } from "firebase/firestore";
 import { isBrowser } from "@/lib/utils";
 import { getAnalytics } from "firebase/analytics";
 import { FirebaseOptions } from "firebase/app";
+import { getStorage, ref, uploadBytes } from "firebase/storage";
+
 
 const config: FirebaseOptions = {
   apiKey: process.env.NEXT_PUBLIC_APIKEY,
@@ -61,18 +63,29 @@ export const MyFirebaseProvider: FC<{ children: ReactNode }> = ({
   );
 };
 
-import { getStorage, ref, uploadBytes } from "firebase/storage";
+
+
 
 export const uploadResume = async (file: File, userId: string): Promise<string> => {
   const storage = getStorage();
   const storageRef = ref(storage, `resumes/${userId}/${file.name}`);
+  const db = getFirestore();
 
   try {
     const snapshot = await uploadBytes(storageRef, file);
     console.log('Uploaded resume successfully');
+
+    // Add the storage ref to the user's Firestore document
+    const userDocRef = doc(db, "users", userId);
+    await updateDoc(userDocRef, {
+      resumeStorageRef: snapshot.ref.fullPath
+    });
+
+    console.log('Updated user document with resume storage ref');
+
     return snapshot.ref.fullPath;
   } catch (error) {
-    console.error('Error uploading resume:', error);
+    console.error('Error uploading resume or updating user document:', error);
     throw error;
   }
 };
