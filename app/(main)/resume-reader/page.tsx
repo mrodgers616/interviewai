@@ -14,10 +14,6 @@ import { uploadResume } from "@/components/firebase-providers";
 const ResumeReader = () => {
   const [file, setFile] = useState<File | null>(null);
   const { toast } = useToast();
-  const app = useFirebaseApp();
-  const db = getFirestore(app);
-  const storage = getStorage(app);
-  const router = useRouter();
   const { data: user } = useUser();
   
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
