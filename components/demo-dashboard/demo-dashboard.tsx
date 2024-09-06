@@ -1,7 +1,6 @@
-import { FC } from "react";
+import { FC, useEffect, useState } from "react";
 import Image from "next/image";
 import { MainNav } from "@/components/demo-dashboard/main-nav";
-import { RecentSales } from "@/components/demo-dashboard/recent-sales";
 import {
   Card,
   CardHeader,
@@ -9,8 +8,62 @@ import {
   CardContent,
   CardDescription,
 } from "@/components/ui/card";
+import { useFirestore, useUser } from "reactfire";
+import { collection, query, where, getDocs } from "firebase/firestore";
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
 export const DemoDashboard: FC = () => {
+  const [userData, setUserData] = useState({
+    totalInterviews: 0,
+    averageScore: 0,
+    skillsImproved: 0,
+    recentInterviews: [],
+  });
+
+  const { data: user } = useUser();
+  const firestore = useFirestore();
+
+  useEffect(() => {
+    const fetchUserData = async () => {
+      if (user) {
+        const interviewsRef = collection(firestore, 'interviews');
+        const q = query(interviewsRef, where("userId", "==", user.uid));
+        const querySnapshot = await getDocs(q);
+        
+        let totalScore = 0;
+        let totalInterviews = 0;
+        let skillsImproved = new Set();
+        let recentInterviews: any = [];
+
+        querySnapshot.forEach((doc) => {
+          const interview = doc.data();
+          totalScore += interview.score;
+          totalInterviews++;
+          skillsImproved.add(interview.skillImproved);
+          recentInterviews.push(interview);
+        });
+
+        setUserData({ 
+          totalInterviews,
+          averageScore: totalInterviews > 0 ? totalScore / totalInterviews : 0,
+          skillsImproved: skillsImproved.size,
+          recentInterviews: recentInterviews.slice(0, 5),
+        });
+      }
+    };
+
+    fetchUserData();
+  }, [user, firestore]);
+
+  const chartData = [
+    { name: 'Jan', score: 65 },
+    { name: 'Feb', score: 59 },
+    { name: 'Mar', score: 80 },
+    { name: 'Apr', score: 81 },
+    { name: 'May', score: 76 },
+    { name: 'Jun', score: 85 },
+  ];
+
   return (
     <>
       <div className="md:hidden">
@@ -32,7 +85,7 @@ export const DemoDashboard: FC = () => {
       <div className="hidden flex-col md:flex">
         <div className="flex items-end justify-between space-y-2 mb-6">
           <h2 className="text-3xl leading-5 font-bold tracking-tight">
-            Dashboard
+            Interview Dashboard
           </h2>
         </div>
         <div className="flex h-16 items-center bg-muted px-6 rounded-xl">
@@ -43,7 +96,7 @@ export const DemoDashboard: FC = () => {
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">
-                  Total Revenue
+                  Total Interviews
                 </CardTitle>
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
@@ -55,21 +108,45 @@ export const DemoDashboard: FC = () => {
                   strokeWidth="2"
                   className="h-4 w-4 text-muted-foreground"
                 >
-                  <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+                  <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" />
+                  <circle cx="12" cy="7" r="4" />
                 </svg>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">$45,231.89</div>
+                <div className="text-2xl font-bold">{userData.totalInterviews}</div>
                 <p className="text-xs text-muted-foreground">
-                  +20.1% from last month
+                  Total interviews completed
                 </p>
               </CardContent>
             </Card>
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">
-                  Subscriptions
+                  Average Score
                 </CardTitle>
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="2"
+                  className="h-4 w-4 text-muted-foreground"
+                >
+                  <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
+                </svg>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{userData.averageScore.toFixed(1)}</div>
+                <p className="text-xs text-muted-foreground">
+                  Average interview score
+                </p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Skills Improved</CardTitle>
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
                   viewBox="0 0 24 24"
@@ -86,40 +163,16 @@ export const DemoDashboard: FC = () => {
                 </svg>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">+2350</div>
+                <div className="text-2xl font-bold">{userData.skillsImproved}</div>
                 <p className="text-xs text-muted-foreground">
-                  +180.1% from last month
-                </p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Sales</CardTitle>
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth="2"
-                  className="h-4 w-4 text-muted-foreground"
-                >
-                  <rect width="20" height="14" x="2" y="5" rx="2" />
-                  <path d="M2 10h20" />
-                </svg>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">+12,234</div>
-                <p className="text-xs text-muted-foreground">
-                  +19% from last month
+                  Unique skills improved
                 </p>
               </CardContent>
             </Card>
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">
-                  Active Now
+                  Next Interview
                 </CardTitle>
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
@@ -131,13 +184,16 @@ export const DemoDashboard: FC = () => {
                   strokeWidth="2"
                   className="h-4 w-4 text-muted-foreground"
                 >
-                  <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
+                  <rect width="18" height="18" x="3" y="4" rx="2" ry="2" />
+                  <line x1="16" x2="16" y1="2" y2="6" />
+                  <line x1="8" x2="8" y1="2" y2="6" />
+                  <line x1="3" x2="21" y1="10" y2="10" />
                 </svg>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">+573</div>
+                <div className="text-2xl font-bold">Tomorrow</div>
                 <p className="text-xs text-muted-foreground">
-                  +201 since last hour
+                  9:00 AM - Software Engineer
                 </p>
               </CardContent>
             </Card>
@@ -145,19 +201,30 @@ export const DemoDashboard: FC = () => {
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
             <Card className="col-span-4">
               <CardHeader>
-                <CardTitle>Overview</CardTitle>
+                <CardTitle>Performance Overview</CardTitle>
               </CardHeader>
-              <CardContent className="pl-2">{/* <Overview /> */}</CardContent>
+              <CardContent className="pl-2">
+                <ResponsiveContainer width="100%" height={350}>
+                  <LineChart data={chartData}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="name" />
+                    <YAxis />
+                    <Tooltip />
+                    <Legend />
+                    <Line type="monotone" dataKey="score" stroke="#8884d8" activeDot={{ r: 8 }} />
+                  </LineChart>
+                </ResponsiveContainer>
+              </CardContent>
             </Card>
             <Card className="col-span-3">
               <CardHeader>
-                <CardTitle>Recent Sales</CardTitle>
+                <CardTitle>Recent Interviews</CardTitle>
                 <CardDescription>
-                  You made 265 sales this month.
+                  Your last {userData.recentInterviews.length} interviews.
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <RecentSales />
+                {/* <RecentInterviews interviews={userData.recentInterviews} /> */}
               </CardContent>
             </Card>
           </div>
