@@ -67,6 +67,12 @@ export const MyFirebaseProvider: FC<{ children: ReactNode }> = ({
 
 
 export const uploadResume = async (file: File, userId: string): Promise<string> => {
+  const MAX_FILE_SIZE = 15 * 1024 * 1024; // 15MB in bytes
+
+  if (file.size > MAX_FILE_SIZE) {
+    throw new Error('File size exceeds the maximum limit of 15MB');
+  }
+
   const storage = getStorage();
   const storageRef = ref(storage, `resumes/${userId}/${file.name}`);
   const db = getFirestore();

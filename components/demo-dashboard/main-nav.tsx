@@ -18,10 +18,10 @@ export function MainNav({
         Overview
       </Link>
       <Link
-        href="#"
+        href="resume-reader"
         className="text-sm font-medium text-muted-foreground transition-colors hover:text-primary"
       >
-        Customers
+        Upload Resume
       </Link>
       <Link
         href="#"

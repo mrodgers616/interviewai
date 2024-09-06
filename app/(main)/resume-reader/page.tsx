@@ -1,24 +1,24 @@
 "use client";
+"use client";
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/components/ui/use-toast";
-import { useFirebaseApp } from "reactfire";
+import { useFirebaseApp, useUser } from "reactfire";
 import { getFirestore } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
-import { collection, addDoc } from "firebase/firestore";
 import { useRouter } from "next/navigation";
+import { uploadResume } from "@/components/firebase-providers";
 
-
-export default function ResumeReader() {
+const ResumeReader = () => {
   const [file, setFile] = useState<File | null>(null);
   const { toast } = useToast();
   const app = useFirebaseApp();
   const db = getFirestore(app);
   const storage = getStorage(app);
   const router = useRouter();
+  const { data: user } = useUser();
   
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
@@ -46,25 +46,18 @@ export default function ResumeReader() {
     }
 
     try {
-      // Upload file to Firebase Storage
-      const storageRef = ref(storage, `resumes/${file.name}`);
-      await uploadBytes(storageRef, file);
-      const downloadURL = await getDownloadURL(storageRef);
+      const userId = user?.uid;
 
-      // Store file metadata in Firestore
-      await addDoc(collection(db, "resumes"), {
-        fileName: file.name,
-        fileType: file.type,
-        uploadDate: new Date(),
-        downloadURL: downloadURL,
-      });
-
-      const docRef = await addDoc(collection(db, "resumes"), {
-        fileName: file.name,
-        fileType: file.type,
-        uploadDate: new Date(),
-        downloadURL: downloadURL,
-      });
+      if (!userId) {
+        toast({
+          title: "User not logged in",
+          description: "Please log in to upload a resume.",
+          variant: "destructive",
+        });
+        return;
+      }
+      console.log("Uploading resume for user:", userId);
+      await uploadResume(file, userId);
 
       toast({
         title: "Resume uploaded successfully",
@@ -72,8 +65,6 @@ export default function ResumeReader() {
       });
 
       setFile(null);
-
-      router.push(`/resume-analysis/${docRef.id}`);
     } catch (error) {
       console.error("Error uploading file:", error);
       toast({
@@ -116,4 +107,6 @@ export default function ResumeReader() {
       </div>
     </div>
   );
-}
+};
+
+export default ResumeReader;
