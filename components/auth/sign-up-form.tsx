@@ -58,6 +58,7 @@ export const SignUpForm: FC<SignUpFormProps> = ({ onShowLogin, onSignUp }) => {
         await setDoc(doc(db, "users", user.user.uid), {
           email: user.user.email,
           createdAt: new Date(),
+          paid: false,
         });
 
         console.log("User added to Firestore database");
