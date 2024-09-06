@@ -60,3 +60,20 @@ export const MyFirebaseProvider: FC<{ children: ReactNode }> = ({
     </>
   );
 };
+
+import { getStorage, ref, uploadBytes } from "firebase/storage";
+
+export const uploadResume = async (file: File, userId: string): Promise<string> => {
+  const storage = getStorage();
+  const storageRef = ref(storage, `resumes/${userId}/${file.name}`);
+
+  try {
+    const snapshot = await uploadBytes(storageRef, file);
+    console.log('Uploaded resume successfully');
+    return snapshot.ref.fullPath;
+  } catch (error) {
+    console.error('Error uploading resume:', error);
+    throw error;
+  }
+};
+
