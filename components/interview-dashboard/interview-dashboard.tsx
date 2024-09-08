@@ -21,6 +21,9 @@ export const InterviewDashboard: FC = () => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+  const silenceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     if (isCameraOn && videoRef.current && stream) {
@@ -45,11 +48,38 @@ export const InterviewDashboard: FC = () => {
         analyser.getByteFrequencyData(dataArray);
         const average = dataArray.reduce((sum, value) => sum + value, 0) / dataArray.length;
         setAudioLevel(average);
-        setIsAudioActive(average > 10); // Adjust this threshold as needed
+        const newIsAudioActive = average > 10; // Adjust this threshold as needed
+        setIsAudioActive(newIsAudioActive);
+        
+        if (newIsAudioActive) {
+          if (silenceTimeoutRef.current) {
+            clearTimeout(silenceTimeoutRef.current);
+          }
+        } else {
+          if (!silenceTimeoutRef.current) {
+            silenceTimeoutRef.current = setTimeout(() => {
+              sendAudioToAI();
+              silenceTimeoutRef.current = null;
+            }, 3000);
+          }
+        }
+        
         requestAnimationFrame(updateAudioLevel);
       };
 
       updateAudioLevel();
+
+      // Set up MediaRecorder for streaming audio
+      const mediaRecorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = mediaRecorder;
+
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          audioChunksRef.current.push(event.data);
+        }
+      };
+
+      mediaRecorder.start(1000); // Collect data every second
     }
 
     return () => {
@@ -57,8 +87,28 @@ export const InterviewDashboard: FC = () => {
         audioContextRef.current.close();
         audioContextRef.current = null;
       }
+      if (mediaRecorderRef.current) {
+        mediaRecorderRef.current.stop();
+      }
+      if (silenceTimeoutRef.current) {
+        clearTimeout(silenceTimeoutRef.current);
+      }
     };
   }, [isMicOn, stream]);
+
+  const sendAudioToAI = async () => {
+    if (audioChunksRef.current.length === 0) return;
+
+    const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+    audioChunksRef.current = []; // Clear the chunks after sending
+
+    // Implement the logic to send audio data to your AI model
+    console.log("Sending audio data to AI model...");
+    // Example:
+    // const formData = new FormData();
+    // formData.append('audio', audioBlob, 'audio.webm');
+    // await fetch('your-ai-endpoint', { method: 'POST', body: formData });
+  };
 
   const startMedia = async () => {
     setIsLoading(true);
@@ -115,6 +165,14 @@ export const InterviewDashboard: FC = () => {
         track.enabled = !isMicOn;
       });
       setIsMicOn(!isMicOn);
+      
+      if (mediaRecorderRef.current) {
+        if (isMicOn) {
+          mediaRecorderRef.current.stop();
+        } else {
+          mediaRecorderRef.current.start(1000);
+        }
+      }
     }
   };
 
@@ -139,6 +197,12 @@ export const InterviewDashboard: FC = () => {
       setIsMicOn(false);
       setIsCameraOn(false);
       setIsInterviewStarted(false);
+    }
+    if (mediaRecorderRef.current) {
+      mediaRecorderRef.current.stop();
+    }
+    if (silenceTimeoutRef.current) {
+      clearTimeout(silenceTimeoutRef.current);
     }
   };
 
