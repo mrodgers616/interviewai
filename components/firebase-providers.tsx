@@ -9,12 +9,12 @@ import {
   useFirebaseApp,
 } from "reactfire";
 import { getAuth } from "firebase/auth";
-import { getFirestore, doc, setDoc, updateDoc } from "firebase/firestore";
+import { getFirestore, doc, setDoc, updateDoc, getDoc } from "firebase/firestore";
 import { isBrowser } from "@/lib/utils";
 import { getAnalytics } from "firebase/analytics";
 import { FirebaseOptions } from "firebase/app";
 import { getStorage, ref, uploadBytes } from "firebase/storage";
-
+import { collection, addDoc, getDocs, query, where, limit } from "firebase/firestore";
 
 const config: FirebaseOptions = {
   apiKey: process.env.NEXT_PUBLIC_APIKEY,
@@ -63,9 +63,6 @@ export const MyFirebaseProvider: FC<{ children: ReactNode }> = ({
   );
 };
 
-
-
-
 export const uploadResume = async (file: File, userId: string): Promise<string> => {
   const MAX_FILE_SIZE = 15 * 1024 * 1024; // 15MB in bytes
 
@@ -96,3 +93,55 @@ export const uploadResume = async (file: File, userId: string): Promise<string> 
   }
 };
 
+export const uploadJobDescription = async (jobDescription: string, userId: string): Promise<string> => {
+  const db = getFirestore();
+  const userDocRef = doc(db, "users", userId);
+  const jobDescriptionsRef = collection(db, "jobDescriptions");
+
+  try {
+    // Update user document
+    await updateDoc(userDocRef, {
+      jobDescription: jobDescription,
+      jobDescriptionUpdatedAt: new Date()
+    });
+
+    // Add to jobDescriptions collection
+    const docRef = await addDoc(jobDescriptionsRef, {
+      userId,
+      description: jobDescription,
+      createdAt: new Date()
+    });
+
+    console.log('Updated user document and added to jobDescriptions collection');
+    return docRef.id;
+  } catch (error) {
+    console.error('Error updating job description:', error);
+    throw error;
+  }
+};
+
+export const fetchExistingJobDescription = async (userId: string): Promise<string | null> => {
+  const db = getFirestore();
+  const userDocRef = doc(db, "users", userId);
+
+  try {
+    const userDoc = await getDoc(userDocRef);
+    if (userDoc.exists() && userDoc.data().jobDescription) {
+      return userDoc.data().jobDescription;
+    }
+
+    // If not in user document, check jobDescriptions collection
+    const jobDescriptionsRef = collection(db, "jobDescriptions");
+    const q = query(jobDescriptionsRef, where("userId", "==", userId), limit(1));
+    const querySnapshot = await getDocs(q);
+    
+    if (!querySnapshot.empty) {
+      return querySnapshot.docs[0].data().description;
+    }
+
+    return null;
+  } catch (error) {
+    console.error('Error fetching job description:', error);
+    throw error;
+  }
+};
