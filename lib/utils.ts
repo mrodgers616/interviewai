@@ -6,3 +6,4 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 export const isBrowser = () => typeof window !== "undefined"
+
