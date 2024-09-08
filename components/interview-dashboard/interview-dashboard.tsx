@@ -50,20 +50,21 @@ export const InterviewDashboard: FC = () => {
         setAudioLevel(average);
         const newIsAudioActive = average > 10; // Adjust this threshold as needed
         setIsAudioActive(newIsAudioActive);
-        
+
         if (newIsAudioActive) {
           if (silenceTimeoutRef.current) {
             clearTimeout(silenceTimeoutRef.current);
           }
         } else {
-          if (!silenceTimeoutRef.current) {
-            silenceTimeoutRef.current = setTimeout(() => {
-              sendAudioToAI();
-              silenceTimeoutRef.current = null;
-            }, 3000);
-          }
+          silenceTimeoutRef.current = setTimeout(() => {
+            if (audioChunksRef.current.length > 0) {
+              const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+              sendAudioToAI(audioBlob);
+              audioChunksRef.current = [];
+            }
+          }, 2000);
         }
-        
+
         requestAnimationFrame(updateAudioLevel);
       };
 
@@ -79,7 +80,7 @@ export const InterviewDashboard: FC = () => {
         }
       };
 
-      mediaRecorder.start(1000); // Collect data every second
+      mediaRecorder.start(100); // Collect data every 100ms
     }
 
     return () => {
@@ -96,17 +97,14 @@ export const InterviewDashboard: FC = () => {
     };
   }, [isMicOn, stream]);
 
-  const sendAudioToAI = async () => {
-    if (audioChunksRef.current.length === 0) return;
-
-    const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
-    audioChunksRef.current = []; // Clear the chunks after sending
-
+  const sendAudioToAI = async (audioData: Blob) => {
     // Implement the logic to send audio data to your AI model
+    // This could involve converting the Blob to the appropriate format
+    // and making an API call to your AI service
     console.log("Sending audio data to AI model...");
     // Example:
     // const formData = new FormData();
-    // formData.append('audio', audioBlob, 'audio.webm');
+    // formData.append('audio', audioData, 'audio.webm');
     // await fetch('your-ai-endpoint', { method: 'POST', body: formData });
   };
 
@@ -170,7 +168,7 @@ export const InterviewDashboard: FC = () => {
         if (isMicOn) {
           mediaRecorderRef.current.stop();
         } else {
-          mediaRecorderRef.current.start(1000);
+          mediaRecorderRef.current.start(100);
         }
       }
     }
