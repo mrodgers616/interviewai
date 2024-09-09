@@ -35,8 +35,11 @@ export function MainNav({
           Upload Resume
         </Link>
         <Link
-          href="#"
-          className="text-sm font-medium text-muted-foreground transition-colors hover:text-primary"
+          href="/job-description"
+          className={cn(
+            "text-sm font-medium transition-colors hover:text-primary",
+            pathname === "/job-description" ? "text-primary" : "text-muted-foreground"
+          )}
         >
           Upload Info
         </Link>
