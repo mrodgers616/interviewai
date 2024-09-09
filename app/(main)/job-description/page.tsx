@@ -8,8 +8,9 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { uploadJobDescription, fetchExistingJobDescription } from "@/components/firebase-providers";
+import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 
-const JobDescriptionInput = () => {
+const JobDescriptionForm = () => {
   const [jobDescription, setJobDescription] = useState('');
   const [existingJobDescription, setExistingJobDescription] = useState<string | null>(null);
   const { toast } = useToast();
@@ -18,11 +19,10 @@ const JobDescriptionInput = () => {
   useEffect(() => {
     const checkExistingJobDescription = async () => {
       if (user) {
-        // Fetch existing job description from Firebase
         const existingDescription = await fetchExistingJobDescription(user.uid);
         if (existingDescription) {
           setExistingJobDescription(existingDescription);
-          setJobDescription(existingDescription);
+          // Remove this line: setJobDescription(existingDescription);
         }
       }
     };
@@ -82,13 +82,14 @@ const JobDescriptionInput = () => {
         </CardHeader>
         <CardContent>
           {existingJobDescription && (
-            <p className="text-sm text-muted-foreground mb-4">
-              Existing job description: {existingJobDescription.substring(0, 100)}...
-            </p>
+            <div className="mb-4">
+              <h3 className="text-sm font-semibold mb-2">Existing Job Description:</h3>
+              <p className="text-sm text-muted-foreground">{existingJobDescription}</p>
+            </div>
           )}
           <form onSubmit={handleSubmit}>
             <Textarea
-              placeholder="Paste the job description here..."
+              placeholder="Enter a new job description here..."
               value={jobDescription}
               onChange={(e) => setJobDescription(e.target.value)}
               className="mb-4 h-64"
@@ -103,4 +104,10 @@ const JobDescriptionInput = () => {
   );
 };
 
-export default JobDescriptionInput;
+export default function JobDescriptionInput() {
+  return (
+    <ProtectedRoute>
+      <JobDescriptionForm />
+    </ProtectedRoute>
+  );
+}

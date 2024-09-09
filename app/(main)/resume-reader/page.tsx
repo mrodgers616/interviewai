@@ -10,9 +10,9 @@ import { getStorage, ref, deleteObject } from "firebase/storage";
 import { useRouter } from "next/navigation";
 import { uploadResume } from "@/components/firebase-providers";
 import { MainNav } from "@/components/demo-dashboard/main-nav";
+import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 
-
-const ResumeReader = () => {
+const ResumeUploader = () => {
   const [file, setFile] = useState<File | null>(null);
   const [existingResume, setExistingResume] = useState<string | null>(null);
   const { toast } = useToast();
@@ -145,4 +145,10 @@ const ResumeReader = () => {
   );
 };
 
-export default ResumeReader;
+export default function ResumeReader() {
+  return (
+    <ProtectedRoute>
+      <ResumeUploader />
+    </ProtectedRoute>
+  );
+}
