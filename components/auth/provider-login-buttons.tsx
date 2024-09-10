@@ -35,6 +35,9 @@ export const ProviderLoginButtons: FC<Props> = ({ onSignIn }) => {
         photoURL: auth.currentUser!.photoURL,
         createdAt: serverTimestamp(),
         paid: false,
+        interviewCount: 0,
+        averageScore: 0,
+        skillsimproved: 0,
       }, { merge: true });
       toast({ title: "Signed in!" });
       onSignIn?.();

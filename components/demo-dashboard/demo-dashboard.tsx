@@ -9,14 +9,14 @@ import {
   CardDescription,
 } from "@/components/ui/card";
 import { useFirestore, useUser } from "reactfire";
-import { collection, query, where, getDocs } from "firebase/firestore";
+import { collection, query, where, getDocs, doc, getDoc } from "firebase/firestore";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
 export const DemoDashboard: FC = () => {
   const [userData, setUserData] = useState({
-    totalInterviews: 0,
+    interviewCount: 0,
     averageScore: 0,
-    skillsImproved: 0,
+    skillsimproved: 0,
     recentInterviews: [],
   });
 
@@ -26,29 +26,34 @@ export const DemoDashboard: FC = () => {
   useEffect(() => {
     const fetchUserData = async () => {
       if (user) {
+        const userDocRef = doc(firestore, 'users', user.uid);
+        const userDocSnap = await getDoc(userDocRef);
+        
+        if (userDocSnap.exists()) {
+          const userData = userDocSnap.data();
+          setUserData({
+            interviewCount: userData.interviewCount || 0,
+            averageScore: userData.averageScore || 0,
+            skillsimproved: userData.skillsimproved || 0,
+            recentInterviews: [],
+          });
+        }
+
         const interviewsRef = collection(firestore, 'interviews');
         const q = query(interviewsRef, where("userId", "==", user.uid));
         const querySnapshot = await getDocs(q);
         
-        let totalScore = 0;
-        let totalInterviews = 0;
-        let skillsImproved = new Set();
         let recentInterviews: any = [];
 
         querySnapshot.forEach((doc) => {
           const interview = doc.data();
-          totalScore += interview.score;
-          totalInterviews++;
-          skillsImproved.add(interview.skillImproved);
           recentInterviews.push(interview);
         });
 
-        setUserData({ 
-          totalInterviews,
-          averageScore: totalInterviews > 0 ? totalScore / totalInterviews : 0,
-          skillsImproved: skillsImproved.size,
+        setUserData(prevState => ({ 
+          ...prevState,
           recentInterviews: recentInterviews.slice(0, 5),
-        });
+        }));
       }
     };
 
@@ -92,7 +97,7 @@ export const DemoDashboard: FC = () => {
           <MainNav />
         </div>
         <div className="flex-1 space-y-4 pt-6">
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">
@@ -113,7 +118,7 @@ export const DemoDashboard: FC = () => {
                 </svg>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{userData.totalInterviews}</div>
+                <div className="text-2xl font-bold">{userData.interviewCount}</div>
                 <p className="text-xs text-muted-foreground">
                   Total interviews completed
                 </p>
@@ -163,37 +168,9 @@ export const DemoDashboard: FC = () => {
                 </svg>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{userData.skillsImproved}</div>
+                <div className="text-2xl font-bold">{userData.skillsimproved}</div>
                 <p className="text-xs text-muted-foreground">
                   Unique skills improved
-                </p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">
-                  Next Interview
-                </CardTitle>
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth="2"
-                  className="h-4 w-4 text-muted-foreground"
-                >
-                  <rect width="18" height="18" x="3" y="4" rx="2" ry="2" />
-                  <line x1="16" x2="16" y1="2" y2="6" />
-                  <line x1="8" x2="8" y1="2" y2="6" />
-                  <line x1="3" x2="21" y1="10" y2="10" />
-                </svg>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">Tomorrow</div>
-                <p className="text-xs text-muted-foreground">
-                  9:00 AM - Software Engineer
                 </p>
               </CardContent>
             </Card>
