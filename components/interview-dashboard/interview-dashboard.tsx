@@ -1,4 +1,4 @@
-import { FC, useState, useRef, useEffect } from "react";
+import { FC, ReactElement, useState, useRef, useEffect } from "react";
 import Image from "next/image";
 import { MainNav } from "@/components/demo-dashboard/main-nav";
 import {
@@ -9,7 +9,7 @@ import {
 } from "@/components/ui/card";
 import { Mic, MicOff, Loader } from 'lucide-react';
 
-export const InterviewDashboard: FC = () => {
+export const InterviewDashboard: FC = (): ReactElement => {
   const [isMicOn, setIsMicOn] = useState(false);
   const [isCameraOn, setIsCameraOn] = useState(false);
   const [stream, setStream] = useState<MediaStream | null>(null);
@@ -18,6 +18,7 @@ export const InterviewDashboard: FC = () => {
   const [isCameraAvailable, setIsCameraAvailable] = useState(true);
   const [isAudioActive, setIsAudioActive] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [transcription, setTranscription] = useState<string>('');
   const videoRef = useRef<HTMLVideoElement>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
@@ -59,7 +60,6 @@ export const InterviewDashboard: FC = () => {
           silenceTimeoutRef.current = setTimeout(() => {
             if (audioChunksRef.current.length > 0) {
               const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
-              sendAudioToAI(audioBlob);
               audioChunksRef.current = [];
             }
           }, 2000);
@@ -97,17 +97,6 @@ export const InterviewDashboard: FC = () => {
     };
   }, [isMicOn, stream]);
 
-  const sendAudioToAI = async (audioData: Blob) => {
-    // Implement the logic to send audio data to your AI model
-    // This could involve converting the Blob to the appropriate format
-    // and making an API call to your AI service
-    console.log("Sending audio data to AI model...");
-    // Example:
-    // const formData = new FormData();
-    // formData.append('audio', audioData, 'audio.webm');
-    // await fetch('your-ai-endpoint', { method: 'POST', body: formData });
-  };
-
   const startMedia = async () => {
     setIsLoading(true);
     console.log("here");
@@ -131,6 +120,7 @@ export const InterviewDashboard: FC = () => {
           setStream(mediaStream);
           setIsMicOn(true);
           console.log("Audio started");
+          startSpeechRecognition(); // Add this line
           
           if (videoTracks.length > 0) {
             setIsCameraOn(true);
@@ -202,6 +192,65 @@ export const InterviewDashboard: FC = () => {
     if (silenceTimeoutRef.current) {
       clearTimeout(silenceTimeoutRef.current);
     }
+    
+    if (typeof window !== 'undefined') {
+      const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+      if (SpeechRecognition) {
+        const recognition = new SpeechRecognition();
+        recognition.stop();
+      }
+    }
+  };
+  const startSpeechRecognition = () => {
+    if (typeof window !== 'undefined') {
+      const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+      if (SpeechRecognition) {
+        console.log("Starting speech recognition...");
+        const recognition = new SpeechRecognition();
+        recognition.continuous = true;
+        recognition.interimResults = true;
+        recognition.lang = 'en-US';
+
+        let lastTranscript = '';
+        let silenceTimer: NodeJS.Timeout | null = null;
+
+        recognition.onresult = (event: any) => {
+          const current = event.resultIndex;
+          const transcript = event.results[current][0].transcript;
+          setTranscription((prev) => prev + ' ' + transcript);
+
+          // Reset the silence timer
+          if (silenceTimer) clearTimeout(silenceTimer);
+          silenceTimer = setTimeout(() => {
+            if (lastTranscript !== transcript) {
+              sendTranscriptionToAI(transcript);
+              lastTranscript = transcript;
+              setTranscription('');
+            }
+          }, 1000); // Adjust this delay as needed
+        };
+
+        recognition.onend = () => {
+          recognition.start();
+        };
+
+        recognition.start();
+      } else {
+        console.error('Speech recognition not supported');
+      }
+    }
+  };
+
+  const sendTranscriptionToAI = async (text: string) => {
+    console.log("Sending transcription to AI:" + text);
+    // Implement the logic to send the transcription to your AI model
+    // This could involve making an API call to your AI service
+    // Example:
+    // await fetch('your-ai-endpoint', {
+    //   method: 'POST',
+    //   headers: { 'Content-Type': 'application/json' },
+    //   body: JSON.stringify({ transcription: text })
+    // });
   };
 
   return (
@@ -341,3 +390,4 @@ export const InterviewDashboard: FC = () => {
     </>
   );
 };
+
