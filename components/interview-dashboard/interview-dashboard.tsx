@@ -7,7 +7,8 @@ import {
   CardTitle,
   CardContent,
 } from "@/components/ui/card";
-import { Mic, MicOff, Loader } from 'lucide-react';
+import { Mic, MicOff, Loader, Clock, ToggleLeft, ToggleRight } from 'lucide-react';
+import { Switch } from "@/components/ui/switch";
 
 export const InterviewDashboard: FC = (): ReactElement => {
   const [isMicOn, setIsMicOn] = useState(false);
@@ -19,12 +20,15 @@ export const InterviewDashboard: FC = (): ReactElement => {
   const [isAudioActive, setIsAudioActive] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [transcription, setTranscription] = useState<string>('');
+  const [interviewTime, setInterviewTime] = useState(0);
+  const [isTimerEnabled, setIsTimerEnabled] = useState(true);
   const videoRef = useRef<HTMLVideoElement>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const silenceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const timerIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     if (isCameraOn && videoRef.current && stream) {
@@ -96,6 +100,31 @@ export const InterviewDashboard: FC = (): ReactElement => {
       }
     };
   }, [isMicOn, stream]);
+
+  useEffect(() => {
+    if (isInterviewStarted) {
+      timerIntervalRef.current = setInterval(() => {
+        setInterviewTime((prevTime) => prevTime + 1);
+      }, 1000);
+    } else {
+      if (timerIntervalRef.current) {
+        clearInterval(timerIntervalRef.current);
+      }
+      setInterviewTime(0);
+    }
+
+    return () => {
+      if (timerIntervalRef.current) {
+        clearInterval(timerIntervalRef.current);
+      }
+    };
+  }, [isInterviewStarted]);
+
+  useEffect(() => {
+    console.log("Interview started:", isInterviewStarted);
+    console.log("Timer enabled:", isTimerEnabled);
+    console.log("Interview time:", interviewTime);
+  }, [isInterviewStarted, isTimerEnabled, interviewTime]);
 
   const startMedia = async () => {
     setIsLoading(true);
@@ -192,6 +221,9 @@ export const InterviewDashboard: FC = (): ReactElement => {
     if (silenceTimeoutRef.current) {
       clearTimeout(silenceTimeoutRef.current);
     }
+    if (timerIntervalRef.current) {
+      clearInterval(timerIntervalRef.current);
+    }
     
     if (typeof window !== 'undefined') {
       const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
@@ -201,6 +233,7 @@ export const InterviewDashboard: FC = (): ReactElement => {
       }
     }
   };
+
   const startSpeechRecognition = () => {
     if (typeof window !== 'undefined') {
       const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
@@ -253,6 +286,16 @@ export const InterviewDashboard: FC = (): ReactElement => {
     // });
   };
 
+  const formatTime = (seconds: number): string => {
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = seconds % 60;
+    return `${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
+  };
+
+  const toggleTimer = () => {
+    setIsTimerEnabled(!isTimerEnabled);
+  };
+
   return (
     <>
       <div className="md:hidden">
@@ -272,10 +315,18 @@ export const InterviewDashboard: FC = (): ReactElement => {
         />
       </div>
       <div className="hidden flex-col md:flex">
-        <div className="flex items-end justify-between space-y-2 mb-6">
+        <div className="flex items-center justify-between space-y-2 mb-6">
           <h2 className="text-3xl leading-5 font-bold tracking-tight">
             {isInterviewStarted ? "Interview in Progress" : "Start Interview"}
           </h2>
+          {isInterviewStarted && isTimerEnabled && (
+            <div className="flex items-center space-x-4">
+              <div className="flex items-center">
+                <Clock className="mr-2" />
+                <span className="text-lg font-semibold">{formatTime(interviewTime)}</span>
+              </div>
+            </div>
+          )}
         </div>
         <div className="flex h-16 items-center bg-muted px-6 rounded-xl">
           <MainNav />
@@ -310,6 +361,20 @@ export const InterviewDashboard: FC = (): ReactElement => {
                   </div>
                 )}
               </div>
+              {isInterviewStarted && (
+                <div className="flex items-center justify-center mt-4 space-x-4">
+                  <span className="text-sm font-medium">
+                    {isTimerEnabled ? 'Hide Timer' : 'Show Timer'}
+                  </span>
+                  <Switch
+                    checked={isTimerEnabled}
+                    onCheckedChange={toggleTimer}
+                  />
+                  {isTimerEnabled && (
+                    <span className="text-lg font-semibold">{formatTime(interviewTime)}</span>
+                  )}
+                </div>
+              )}
             </CardContent>
           </Card>
           {!isInterviewStarted ? (
