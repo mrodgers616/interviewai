@@ -1,4 +1,4 @@
-import { FC, useState, useRef, useEffect } from "react";
+import { FC, useState, useRef, useEffect, useCallback } from "react";
 import Image from "next/image";
 import { MainNav } from "@/components/demo-dashboard/main-nav";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
@@ -6,6 +6,9 @@ import { VideoDisplay } from "./VideoDisplay";
 import { AudioLevelIndicator } from "./AudioLevelIndicator";
 import { TimerDisplay } from "./TimerDisplay";
 import { ControlButtons } from "./ControlButtons";
+import { TranscriptionDisplay } from "./TranscriptionDisplay";
+import debounce from 'lodash/debounce';
+
 
 export const InterviewDashboard: FC = () => {
   const [isMicOn, setIsMicOn] = useState(false);
@@ -18,12 +21,36 @@ export const InterviewDashboard: FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [interviewTime, setInterviewTime] = useState(0);
   const [isTimerEnabled, setIsTimerEnabled] = useState(true);
+  const [transcription, setTranscription] = useState("");
+  const [currentQuestion, setCurrentQuestion] = useState("");
+  const [isQuestionRead, setIsQuestionRead] = useState(false);
+  const [isUserSpeaking, setIsUserSpeaking] = useState(false);
+  const [isSpeaking, setIsSpeaking] = useState(false);
+  const [systemStatus, setSystemStatus] = useState<"idle" | "listening" | "processing" | "speaking">("idle");
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const silenceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const timerIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const recognitionRef = useRef<any>(null);
+  const lastTranscriptRef = useRef<string>("");
+
+  const setDebouncedSystemStatus = useCallback(
+    debounce((status: "idle" | "listening" | "processing" | "speaking") => {
+      setSystemStatus(status);
+    }, 300),
+    []
+  );
+
+  const debouncedSendTranscriptionToLLM = useCallback(
+    debounce((text: string) => {
+      if (!isUserSpeaking && !isSpeaking) {
+        sendTranscriptionToLLM(text);
+      }
+    }, 1000), // Reduced debounce time to 1 second
+    [isUserSpeaking, isSpeaking]
+  );
 
   useEffect(() => {
     if (isMicOn && stream) {
@@ -42,23 +69,32 @@ export const InterviewDashboard: FC = () => {
         analyser.getByteFrequencyData(dataArray);
         const average = dataArray.reduce((sum, value) => sum + value, 0) / dataArray.length;
         setAudioLevel(average);
-        const newIsAudioActive = average > 10; // Adjust this threshold as needed
+        const newIsAudioActive = average > 20; // Increased threshold
         setIsAudioActive(newIsAudioActive);
+        setIsUserSpeaking(newIsAudioActive);
 
         if (newIsAudioActive) {
+          setDebouncedSystemStatus("listening");
           if (silenceTimeoutRef.current) {
             clearTimeout(silenceTimeoutRef.current);
+            silenceTimeoutRef.current = null;
           }
         } else {
-          silenceTimeoutRef.current = setTimeout(() => {
-            if (audioChunksRef.current.length > 0) {
-              const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
-              audioChunksRef.current = [];
-            }
-          }, 2000);
+          if (!silenceTimeoutRef.current) {
+            silenceTimeoutRef.current = setTimeout(() => {
+              setIsUserSpeaking(false);
+              if (lastTranscriptRef.current.trim() !== transcription.trim()) {
+                lastTranscriptRef.current = transcription;
+                debouncedSendTranscriptionToLLM(transcription);
+              }
+              silenceTimeoutRef.current = null;
+            }, 1000); // Reduced silence time to 1 second
+          }
         }
 
-        requestAnimationFrame(updateAudioLevel);
+        if (isInterviewStarted) {
+          requestAnimationFrame(updateAudioLevel);
+        }
       };
 
       updateAudioLevel();
@@ -88,7 +124,7 @@ export const InterviewDashboard: FC = () => {
         clearTimeout(silenceTimeoutRef.current);
       }
     };
-  }, [isMicOn, stream]);
+  }, [isMicOn, stream, isInterviewStarted, transcription, setDebouncedSystemStatus, debouncedSendTranscriptionToLLM]);
 
   useEffect(() => {
     if (isInterviewStarted) {
@@ -127,6 +163,10 @@ export const InterviewDashboard: FC = () => {
         if (audioTracks.length > 0) {
           setStream(mediaStream);
           setIsMicOn(true);
+          // Ensure the microphone is unmuted
+          audioTracks.forEach(track => {
+            track.enabled = true;
+          });
           startSpeechRecognition();
           
           if (videoTracks.length > 0) {
@@ -137,6 +177,10 @@ export const InterviewDashboard: FC = () => {
           }
           
           setIsInterviewStarted(true);
+          setDebouncedSystemStatus("listening");
+          // Set initial question
+          setCurrentQuestion("Tell me about yourself and your background.");
+          speakQuestion("Tell me about yourself and your background.");
         } else {
           console.error("Failed to start microphone");
           mediaStream.getTracks().forEach(track => track.stop());
@@ -148,6 +192,65 @@ export const InterviewDashboard: FC = () => {
       console.error("Error accessing media devices:", error);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const startSpeechRecognition = () => {
+    if (typeof window !== 'undefined') {
+      const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+      if (SpeechRecognition) {
+        const recognition = new SpeechRecognition();
+        recognition.continuous = true;
+        recognition.interimResults = true;
+        recognition.lang = 'en-US';
+
+        recognitionRef.current = recognition;
+
+        let fullTranscript = '';
+
+        recognition.onstart = () => {
+          console.log("Speech recognition started");
+        };
+
+        recognition.onresult = (event: any) => {
+          console.log("Speech recognition result received");
+          let interimTranscript = '';
+          for (let i = event.resultIndex; i < event.results.length; i++) {
+            const transcript = event.results[i][0].transcript;
+            if (event.results[i].isFinal) {
+              fullTranscript += transcript + ' ';
+            } else {
+              interimTranscript += transcript;
+            }
+          }
+          const currentTranscript = fullTranscript + interimTranscript;
+          console.log("Transcription:", currentTranscript);
+          setTranscription(currentTranscript);
+          setIsUserSpeaking(true);
+          setDebouncedSystemStatus("listening");
+          
+          // Trigger LLM call when there's a final result
+          if (event.results[event.results.length - 1].isFinal) {
+            debouncedSendTranscriptionToLLM(currentTranscript);
+          }
+        };
+
+        recognition.onerror = (event: any) => {
+          console.error("Speech recognition error:", event.error);
+        };
+
+        recognition.onend = () => {
+          console.log("Speech recognition ended");
+          if (isInterviewStarted) {
+            console.log("Restarting speech recognition");
+            recognition.start();
+          }
+        };
+
+        recognition.start();
+      } else {
+        console.error('Speech recognition not supported');
+      }
     }
   };
 
@@ -200,56 +303,92 @@ export const InterviewDashboard: FC = () => {
       clearInterval(timerIntervalRef.current);
     }
     
-    if (typeof window !== 'undefined') {
-      const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-      if (SpeechRecognition) {
-        const recognition = new SpeechRecognition();
-        recognition.stop();
-      }
+    if (recognitionRef.current) {
+      recognitionRef.current.stop();
+    }
+    setTranscription("");
+    setCurrentQuestion("");
+    setIsQuestionRead(false);
+    setIsUserSpeaking(false);
+    setIsSpeaking(false);
+    lastTranscriptRef.current = "";
+    setDebouncedSystemStatus("idle");
+    
+    // Cancel any ongoing speech synthesis
+    if ('speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
     }
   };
 
-  const startSpeechRecognition = () => {
-    if (typeof window !== 'undefined') {
-      const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-      if (SpeechRecognition) {
-        const recognition = new SpeechRecognition();
-        recognition.continuous = true;
-        recognition.interimResults = true;
-        recognition.lang = 'en-US';
-
-        let lastTranscript = '';
-        let silenceTimer: NodeJS.Timeout | null = null;
-
-        recognition.onresult = (event: any) => {
-          const current = event.resultIndex;
-          const transcript = event.results[current][0].transcript;
-
-          // Reset the silence timer
-          if (silenceTimer) clearTimeout(silenceTimer);
-          silenceTimer = setTimeout(() => {
-            if (lastTranscript !== transcript) {
-              sendTranscriptionToAI(transcript);
-              lastTranscript = transcript;
-            }
-          }, 1000); // Adjust this delay as needed
-        };
-
-        recognition.onend = () => {
-          recognition.start();
-        };
-
-        recognition.start();
+  const sendTranscriptionToLLM = async (text: string) => {
+    console.log("Sending transcription to LLM:", text);
+    if (isUserSpeaking || isSpeaking) return;
+    
+    setDebouncedSystemStatus("processing");
+    try {
+      const response = await fetch('/api/llm', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ text }),
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to get response from LLM');
+      }
+      
+      const data = await response.json();
+      console.log("LLM response:", data);
+      if (data.question) {
+        setCurrentQuestion(data.question);
+        setIsQuestionRead(false);
+        setDebouncedSystemStatus("speaking");
+        speakQuestion(data.question);
       } else {
-        console.error('Speech recognition not supported');
+        throw new Error('No question received from LLM');
       }
+    } catch (error) {
+      console.error('Error sending transcription to LLM:', error);
+      setDebouncedSystemStatus("idle");
     }
   };
 
-  const sendTranscriptionToAI = async (text: string) => {
-    console.log("Sending transcription to AI:" + text);
-    // Implement the logic to send the transcription to your AI model
-    // This could involve making an API call to your AI service
+  const speakQuestion = (question: string) => {
+    if ('speechSynthesis' in window && !isQuestionRead && !isUserSpeaking) {
+      // Cancel any ongoing speech
+      window.speechSynthesis.cancel();
+
+      const utterance = new SpeechSynthesisUtterance(question);
+      utterance.onstart = () => {
+        setIsQuestionRead(true);
+        setIsSpeaking(true);
+        setDebouncedSystemStatus("speaking");
+        // Mute the microphone while speaking
+        if (stream) {
+          stream.getAudioTracks().forEach(track => {
+            track.enabled = false;
+          });
+        }
+      };
+      utterance.onend = () => {
+        setIsQuestionRead(true);
+        setIsSpeaking(false);
+        setDebouncedSystemStatus("listening");
+        setTranscription(""); // Clear the transcription for the new question
+        lastTranscriptRef.current = ""; // Reset the last transcript
+        // Unmute the microphone after speaking
+        if (stream) {
+          stream.getAudioTracks().forEach(track => {
+            track.enabled = true;
+          });
+        }
+      };
+      window.speechSynthesis.speak(utterance);
+    } else if (!('speechSynthesis' in window)) {
+      console.error('Text-to-speech not supported');
+      setDebouncedSystemStatus("idle");
+    }
   };
 
   const toggleTimer = () => {
@@ -306,6 +445,14 @@ export const InterviewDashboard: FC = () => {
               </div>
             </CardContent>
           </Card>
+          <div className="text-center text-lg font-semibold">
+            System Status: {systemStatus}
+          </div>
+          <TranscriptionDisplay
+            transcription={transcription}
+            currentQuestion={currentQuestion}
+            systemStatus={systemStatus}
+          />
           <ControlButtons
             isInterviewStarted={isInterviewStarted}
             isLoading={isLoading}
