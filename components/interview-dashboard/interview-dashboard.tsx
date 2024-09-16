@@ -9,6 +9,7 @@ import { ControlButtons } from "./ControlButtons";
 import { TranscriptionDisplay } from "./TranscriptionDisplay";
 import debounce from 'lodash/debounce';
 
+
 export const InterviewDashboard: FC = () => {
   const [isMicOn, setIsMicOn] = useState(false);
   const [isCameraOn, setIsCameraOn] = useState(false);
@@ -42,6 +43,15 @@ export const InterviewDashboard: FC = () => {
     []
   );
 
+  const debouncedSendTranscriptionToLLM = useCallback(
+    debounce((text: string) => {
+      if (!isUserSpeaking && !isSpeaking) {
+        sendTranscriptionToLLM(text);
+      }
+    }, 1000), // Reduced debounce time to 1 second
+    [isUserSpeaking, isSpeaking]
+  );
+
   useEffect(() => {
     if (isMicOn && stream) {
       if (!audioContextRef.current) {
@@ -67,19 +77,19 @@ export const InterviewDashboard: FC = () => {
           setDebouncedSystemStatus("listening");
           if (silenceTimeoutRef.current) {
             clearTimeout(silenceTimeoutRef.current);
+            silenceTimeoutRef.current = null;
           }
         } else {
-          silenceTimeoutRef.current = setTimeout(() => {
-            if (audioChunksRef.current.length > 0) {
-              audioChunksRef.current = [];
+          if (!silenceTimeoutRef.current) {
+            silenceTimeoutRef.current = setTimeout(() => {
               setIsUserSpeaking(false);
-              setDebouncedSystemStatus("processing");
               if (lastTranscriptRef.current.trim() !== transcription.trim()) {
                 lastTranscriptRef.current = transcription;
-                sendTranscriptionToLLM(transcription);
+                debouncedSendTranscriptionToLLM(transcription);
               }
-            }
-          }, 2000); // Reduced silence timeout to 2 seconds
+              silenceTimeoutRef.current = null;
+            }, 1000); // Reduced silence time to 1 second
+          }
         }
 
         if (isInterviewStarted) {
@@ -114,7 +124,7 @@ export const InterviewDashboard: FC = () => {
         clearTimeout(silenceTimeoutRef.current);
       }
     };
-  }, [isMicOn, stream, isInterviewStarted, transcription, setDebouncedSystemStatus]);
+  }, [isMicOn, stream, isInterviewStarted, transcription, setDebouncedSystemStatus, debouncedSendTranscriptionToLLM]);
 
   useEffect(() => {
     if (isInterviewStarted) {
@@ -153,6 +163,10 @@ export const InterviewDashboard: FC = () => {
         if (audioTracks.length > 0) {
           setStream(mediaStream);
           setIsMicOn(true);
+          // Ensure the microphone is unmuted
+          audioTracks.forEach(track => {
+            track.enabled = true;
+          });
           startSpeechRecognition();
           
           if (videoTracks.length > 0) {
@@ -178,6 +192,65 @@ export const InterviewDashboard: FC = () => {
       console.error("Error accessing media devices:", error);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const startSpeechRecognition = () => {
+    if (typeof window !== 'undefined') {
+      const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+      if (SpeechRecognition) {
+        const recognition = new SpeechRecognition();
+        recognition.continuous = true;
+        recognition.interimResults = true;
+        recognition.lang = 'en-US';
+
+        recognitionRef.current = recognition;
+
+        let fullTranscript = '';
+
+        recognition.onstart = () => {
+          console.log("Speech recognition started");
+        };
+
+        recognition.onresult = (event: any) => {
+          console.log("Speech recognition result received");
+          let interimTranscript = '';
+          for (let i = event.resultIndex; i < event.results.length; i++) {
+            const transcript = event.results[i][0].transcript;
+            if (event.results[i].isFinal) {
+              fullTranscript += transcript + ' ';
+            } else {
+              interimTranscript += transcript;
+            }
+          }
+          const currentTranscript = fullTranscript + interimTranscript;
+          console.log("Transcription:", currentTranscript);
+          setTranscription(currentTranscript);
+          setIsUserSpeaking(true);
+          setDebouncedSystemStatus("listening");
+          
+          // Trigger LLM call when there's a final result
+          if (event.results[event.results.length - 1].isFinal) {
+            debouncedSendTranscriptionToLLM(currentTranscript);
+          }
+        };
+
+        recognition.onerror = (event: any) => {
+          console.error("Speech recognition error:", event.error);
+        };
+
+        recognition.onend = () => {
+          console.log("Speech recognition ended");
+          if (isInterviewStarted) {
+            console.log("Restarting speech recognition");
+            recognition.start();
+          }
+        };
+
+        recognition.start();
+      } else {
+        console.error('Speech recognition not supported');
+      }
     }
   };
 
@@ -247,49 +320,9 @@ export const InterviewDashboard: FC = () => {
     }
   };
 
-  const startSpeechRecognition = () => {
-    if (typeof window !== 'undefined') {
-      const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-      if (SpeechRecognition) {
-        const recognition = new SpeechRecognition();
-        recognition.continuous = true;
-        recognition.interimResults = true;
-        recognition.lang = 'en-US';
-
-        recognitionRef.current = recognition;
-
-        let fullTranscript = '';
-
-        recognition.onresult = (event: any) => {
-          let interimTranscript = '';
-          for (let i = event.resultIndex; i < event.results.length; i++) {
-            const transcript = event.results[i][0].transcript;
-            if (event.results[i].isFinal) {
-              fullTranscript += transcript + ' ';
-            } else {
-              interimTranscript += transcript;
-            }
-          }
-          setTranscription(fullTranscript + interimTranscript);
-          setIsUserSpeaking(true);
-          setDebouncedSystemStatus("listening");
-        };
-
-        recognition.onend = () => {
-          if (isInterviewStarted) {
-            recognition.start();
-          }
-        };
-
-        recognition.start();
-      } else {
-        console.error('Speech recognition not supported');
-      }
-    }
-  };
-
   const sendTranscriptionToLLM = async (text: string) => {
-    if (isUserSpeaking || isSpeaking) return; // Don't send if the user or system is speaking
+    console.log("Sending transcription to LLM:", text);
+    if (isUserSpeaking || isSpeaking) return;
     
     setDebouncedSystemStatus("processing");
     try {
@@ -306,6 +339,7 @@ export const InterviewDashboard: FC = () => {
       }
       
       const data = await response.json();
+      console.log("LLM response:", data);
       if (data.question) {
         setCurrentQuestion(data.question);
         setIsQuestionRead(false);
@@ -342,6 +376,7 @@ export const InterviewDashboard: FC = () => {
         setIsSpeaking(false);
         setDebouncedSystemStatus("listening");
         setTranscription(""); // Clear the transcription for the new question
+        lastTranscriptRef.current = ""; // Reset the last transcript
         // Unmute the microphone after speaking
         if (stream) {
           stream.getAudioTracks().forEach(track => {
