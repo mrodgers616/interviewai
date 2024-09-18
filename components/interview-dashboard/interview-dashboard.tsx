@@ -9,6 +9,11 @@ import { ControlButtons } from "./ControlButtons";
 import { TranscriptionDisplay } from "./TranscriptionDisplay";
 import debounce from 'lodash/debounce';
 
+// Add a new utility function to update the system status
+const updateSystemStatus = (setSystemStatus: React.Dispatch<React.SetStateAction<"idle" | "listening" | "processing" | "speaking">>, status: "idle" | "listening" | "processing" | "speaking") => {
+  setSystemStatus(status);
+};
+
 
 export const InterviewDashboard: FC = () => {
   const [isMicOn, setIsMicOn] = useState(false);
@@ -423,55 +428,143 @@ export const InterviewDashboard: FC = () => {
           <MainNav />
         </div>
         <div className="flex-1 space-y-4 pt-6">
-          <Card className="col-span-4">
-            <CardHeader>
-              <CardTitle>Interview Practice</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="w-full max-w-4xl mx-auto relative">
-                <VideoDisplay
-                  isLoading={isLoading}
-                  isInterviewStarted={isInterviewStarted}
-                  isCameraOn={isCameraOn}
-                  isCameraAvailable={isCameraAvailable}
-                  stream={stream}
-                />
-                {isInterviewStarted && (
-                  <AudioLevelIndicator
-                    isMicOn={isMicOn}
-                    isAudioActive={isAudioActive}
-                  />
-                )}
+          <div className="flex">
+            <div className="w-3/5 pr-4">
+              <Card className="col-span-4">
+                <CardHeader>
+                  <CardTitle>Interview Practice</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="w-full max-w-4xl mx-auto relative">
+                    <VideoDisplay
+                      isLoading={isLoading}
+                      isInterviewStarted={isInterviewStarted}
+                      isCameraOn={isCameraOn}
+                      isCameraAvailable={isCameraAvailable}
+                      stream={stream}
+                    />
+                    {isInterviewStarted && (
+                      <AudioLevelIndicator
+                        isMicOn={isMicOn}
+                        isAudioActive={isAudioActive}
+                      />
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+            <div className="w-2/5 pl-4">
+              <div className="text-center text-lg font-semibold mb-4">
+                System Status: {systemStatus}
               </div>
-            </CardContent>
-          </Card>
-          <div className="text-center text-lg font-semibold">
-            System Status: {systemStatus}
+              <TranscriptionDisplay
+                transcription={transcription}
+                currentQuestion={currentQuestion}
+                systemStatus={systemStatus}
+              />
+              <ControlButtons
+                isInterviewStarted={isInterviewStarted}
+                isLoading={isLoading}
+                isMicOn={isMicOn}
+                isCameraOn={isCameraOn}
+                isCameraAvailable={isCameraAvailable}
+                startMedia={startMedia}
+                toggleMic={toggleMic}
+                toggleCamera={toggleCamera}
+                endCall={endCall}
+              />
+              <TimerDisplay
+                isInterviewStarted={isInterviewStarted}
+                isTimerEnabled={isTimerEnabled}
+                interviewTime={interviewTime}
+                toggleTimer={toggleTimer}
+              />
+            </div>
           </div>
-          <TranscriptionDisplay
-            transcription={transcription}
-            currentQuestion={currentQuestion}
-            systemStatus={systemStatus}
-          />
-          <ControlButtons
-            isInterviewStarted={isInterviewStarted}
-            isLoading={isLoading}
-            isMicOn={isMicOn}
-            isCameraOn={isCameraOn}
-            isCameraAvailable={isCameraAvailable}
-            startMedia={startMedia}
-            toggleMic={toggleMic}
-            toggleCamera={toggleCamera}
-            endCall={endCall}
-          />
-          <TimerDisplay
-            isInterviewStarted={isInterviewStarted}
-            isTimerEnabled={isTimerEnabled}
-            interviewTime={interviewTime}
-            toggleTimer={toggleTimer}
-          />
         </div>
       </div>
     </>
   );
 };
+
+
+//   return (
+//     <>
+//       <div className="md:hidden">
+//         <Image
+//           src="/examples/dashboard-light.png"
+//           width={1280}
+//           height={866}
+//           alt="Dashboard"
+//           className="block dark:hidden"
+//         />
+//         <Image
+//           src="/examples/dashboard-dark.png"
+//           width={1280}
+//           height={866}
+//           alt="Dashboard"
+//           className="hidden dark:block"
+//         />
+//       </div>
+//       <div className="hidden flex-col md:flex">
+//         <div className="flex items-center justify-between space-y-2 mb-6">
+//           <h2 className="text-3xl leading-5 font-bold tracking-tight">
+//             {isInterviewStarted ? "Interview in Progress" : "Start Interview"}
+//           </h2>
+//         </div>
+//         <div className="flex h-16 items-center bg-muted px-6 rounded-xl">
+//           <MainNav />
+//         </div>
+//         <div className="flex-1 space-y-4 pt-6">
+//           <Card className="col-span-4">
+//             <CardHeader>
+//               <CardTitle>Interview Practice</CardTitle>
+//             </CardHeader>
+//             <CardContent>
+//               <div className="w-full max-w-4xl mx-auto relative">
+//                 <VideoDisplay
+//                   isLoading={isLoading}
+//                   isInterviewStarted={isInterviewStarted}
+//                   isCameraOn={isCameraOn}
+//                   isCameraAvailable={isCameraAvailable}
+//                   stream={stream}
+//                 />
+//                 {isInterviewStarted && (
+//                   <AudioLevelIndicator
+//                     isMicOn={isMicOn}
+//                     isAudioActive={isAudioActive}
+//                   />
+//                 )}
+//               </div>
+//             </CardContent>
+//           </Card>
+//           <div className="text-center text-lg font-semibold">
+//             System Status: {systemStatus}
+//           </div>
+//           <TranscriptionDisplay
+//             transcription={transcription}
+//             currentQuestion={currentQuestion}
+//             systemStatus={systemStatus}
+//           />
+//           <ControlButtons
+//             isInterviewStarted={isInterviewStarted}
+//             isLoading={isLoading}
+//             isMicOn={isMicOn}
+//             isCameraOn={isCameraOn}
+//             isCameraAvailable={isCameraAvailable}
+//             startMedia={startMedia}
+//             toggleMic={toggleMic}
+//             toggleCamera={toggleCamera}
+//             endCall={endCall}
+//           />
+//           <TimerDisplay
+//             isInterviewStarted={isInterviewStarted}
+//             isTimerEnabled={isTimerEnabled}
+//             interviewTime={interviewTime}
+//             toggleTimer={toggleTimer}
+//           />
+//         </div>
+//       </div>
+//     </>
+//   );
+// };
