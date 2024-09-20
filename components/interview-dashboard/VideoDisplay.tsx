@@ -21,6 +21,7 @@ export const VideoDisplay: FC<VideoDisplayProps> = ({
   useEffect(() => {
     if (isCameraOn && videoRef.current && stream) {
       videoRef.current.srcObject = stream;
+      videoRef.current.muted = true; // Mute the video element to prevent audio feedback
     }
   }, [isCameraOn, stream]);
 
@@ -30,9 +31,17 @@ export const VideoDisplay: FC<VideoDisplayProps> = ({
         <Loader className="animate-spin text-white text-4xl" />
       ) : isInterviewStarted ? (
         isCameraOn && isCameraAvailable ? (
-          <video ref={videoRef} autoPlay playsInline className="w-full h-full object-cover rounded-lg" />
+          <video
+            ref={videoRef}
+            autoPlay
+            playsInline
+            muted // Ensure the muted attribute is set
+            className="w-full h-full object-cover rounded-lg"
+          />
         ) : (
-          <p className="text-white text-lg">Camera is {isCameraAvailable ? 'off' : 'not available'}</p>
+          <p className="text-white text-lg">
+            Camera is {isCameraAvailable ? 'off' : 'not available'}
+          </p>
         )
       ) : (
         <p className="text-white text-lg">Interview not started</p>
