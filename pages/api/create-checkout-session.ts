@@ -1,5 +1,20 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import Stripe from 'stripe';
+import { getFirestore, doc, updateDoc } from 'firebase/firestore';
+import { initializeApp } from 'firebase/app';
+
+const firebaseConfig = {
+  apiKey: process.env.NEXT_PUBLIC_APIKEY,
+  authDomain: process.env.NEXT_PUBLIC_AUTHDOMAIN,
+  projectId: process.env.NEXT_PUBLIC_PROJECTID,
+  storageBucket: process.env.NEXT_PUBLIC_STORAGEBUCKET,
+  messagingSenderId: process.env.NEXT_PUBLIC_MESSAGINGSENDERID,
+  appId: process.env.NEXT_PUBLIC_APPID,
+  measurementId: process.env.NEXT_PUBLIC_MEASUREMENTID
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
 
 const stripe = new Stripe(process.env.NEXT_PUBLIC_STRIPE_SECRET_KEY!, {
   apiVersion: '2024-06-20', // Use a valid, current API version
@@ -33,9 +48,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         client_reference_id: userId,
       });
 
-      res.status(200).json({ id: session.id}); // Include sessionId in the response
+      // Update user's paid attribute in Firestore
+      const userRef = doc(db, 'users', userId);
+      await updateDoc(userRef, {
+        paid: true
+      });
+
+      res.status(200).json({ id: session.id }); // Include sessionId in the response
     } catch (err: any) {
-        console.log(err);
+      console.log(err);
       res.status(500).json({ statusCode: 500, message: err.message });
     }
   } else {
