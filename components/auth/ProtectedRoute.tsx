@@ -1,20 +1,35 @@
-import { useUser } from "reactfire";
+import { useUser, useFirestore } from "reactfire";
 import { useRouter } from "next/navigation";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
+import { doc, getDoc } from "firebase/firestore";
 
-export function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const { data: user, status } = useUser();
+export const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
+  const { data: user } = useUser();
+  const firestore = useFirestore();
   const router = useRouter();
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    if (status === "success" && !user) {
-      router.push("/login"); // Redirect to login page if not authenticated
-    }
-  }, [user, status, router]);
+    const checkAuth = async () => {
+      if (!user) {
+        router.push('/login');
+      } else {
+        const userDocRef = doc(firestore, 'users', user.uid);
+        const userDoc = await getDoc(userDocRef);
+        if (!userDoc.exists() || !userDoc.data().paid) {
+          router.push('/payment');
+        } else {
+          setIsLoading(false);
+        }
+      }
+    };
 
-  if (status === "loading") {
-    return <div>Loading...</div>; // Or a proper loading component
+    checkAuth();
+  }, [user, firestore, router]);
+
+  if (isLoading) {
+    return <div>Loading...</div>;
   }
 
-  return user ? <>{children}</> : null;
-}
+  return <>{children}</>;
+};

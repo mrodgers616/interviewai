@@ -19,6 +19,7 @@ import { Button } from "@/components/ui/button";
 import { useAuth } from "reactfire";
 import { signInWithEmailAndPassword } from "firebase/auth";
 import { ModalForgotPassword } from "@/components/auth/modal-forgot-password";
+import { useRouter } from "next/navigation";
 
 const formSchema = z.object({
   email: z.string().email(),
@@ -32,6 +33,7 @@ interface SignInFormProps {
 export const SignInForm: FC<SignInFormProps> = ({ onShowSignUp }) => {
   const auth = useAuth();
   const [isResetOpen, setIsResetOpen] = useState(false);
+  const router = useRouter();
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -51,6 +53,7 @@ export const SignInForm: FC<SignInFormProps> = ({ onShowSignUp }) => {
         title: "Success!",
         description: "You have been signed in.",
       });
+      router.push('/payment');
     } catch (error) {
       toast({ title: "Error Signing In", description: `${error}` });
     } finally {
