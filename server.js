@@ -29,8 +29,8 @@ app.prepare().then(() => {
   const wss = new WebSocketServer({
     noServer: true,
     verifyClient: (info, callback) => {
-      const allowedOrigins = ['http://localhost:3000', 'http://localhost:3001'];
-      if (allowedOrigins.includes(info.origin)) {
+      const allowedOrigins = ['http://localhost:3000', 'http://localhost:3001', 'https://nextjs-server-897fb9f8b4e1.herokuapp.com/'];
+      if (allowedOrigins.includes(info.origin) || info.origin.endsWith('.herokuapp.com')) {
         callback(true);
       } else {
         callback(false, 403, 'Forbidden');
@@ -153,8 +153,10 @@ app.prepare().then(() => {
     console.error('[WebSocketServer] Error:', error);
   });
 
-  server.listen(3001, (err) => {
+  const port = process.env.PORT || 3001;
+
+  server.listen(port, (err) => {
     if (err) throw err;
-    console.log('> Ready on http://localhost:3001');
+    console.log(`> Ready on http://localhost:${port}`);
   });
 });

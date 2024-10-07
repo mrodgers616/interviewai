@@ -374,7 +374,16 @@ export const InterviewDashboard: FC = () => {
 
   useEffect(() => {
     const connectWebSocket = () => {
-      const wsUrl = `ws://${window.location.hostname}:3001/api/realtime-api`;
+      const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+      const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      let wsUrl;
+
+      if (isLocalhost) {
+        wsUrl = `${wsProtocol}//${window.location.hostname}:3001/api/realtime-api`;
+      } else {
+        wsUrl = 'wss://nextjs-server-897fb9f8b4e1.herokuapp.com/api/realtime-api';
+      }
+
       console.log('Attempting to connect to WebSocket:', wsUrl);
       
       const ws = new WebSocket(wsUrl);
