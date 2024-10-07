@@ -9,6 +9,7 @@ import { ControlButtons } from "./ControlButtons";
 import { TranscriptionDisplay } from "./TranscriptionDisplay";
 import debounce from 'lodash/debounce';
 import { toast } from 'react-hot-toast';
+import { encodeAudioToBase64 } from '@/utils/audioUtils'; // Add this import
 
 const updateSystemStatus = (setSystemStatus: React.Dispatch<React.SetStateAction<"idle" | "listening" | "processing" | "speaking">>, status: "idle" | "listening" | "processing" | "speaking") => {
   setSystemStatus(status);
@@ -45,9 +46,17 @@ export const InterviewDashboard: FC = () => {
   const wsRef = useRef<WebSocket | null>(null);
   const [wsStatus, setWsStatus] = useState<'connecting' | 'open' | 'closed'>('closed');
 
-  const sendAudioChunk = useCallback((audioChunk: ArrayBuffer) => {
+  const sendAudioChunk = useCallback((audioChunk: Float32Array) => {
     if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-      const base64Audio = btoa(String.fromCharCode.apply(null, Array.from(new Uint8Array(audioChunk))));
+      // Convert Float32Array to Int16Array
+      const pcmBuffer = new Int16Array(audioChunk.length);
+      for (let i = 0; i < audioChunk.length; i++) {
+        pcmBuffer[i] = Math.max(-32768, Math.min(32767, Math.floor(audioChunk[i] * 32767)));
+      }
+      
+      // Encode the Int16Array to base64
+      const base64Audio = encodeAudioToBase64(pcmBuffer);
+      
       wsRef.current.send(JSON.stringify({
         type: 'audio',
         data: base64Audio
@@ -61,6 +70,12 @@ export const InterviewDashboard: FC = () => {
     }, 300),
     []
   );
+
+  const commitAudioBuffer = useCallback(() => {
+    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify({ type: 'input_audio_buffer.commit' }));
+    }
+  }, []);
 
   useEffect(() => {
     if (isMicOn && stream) {
@@ -114,13 +129,7 @@ export const InterviewDashboard: FC = () => {
         // Resample to 24kHz if necessary
         const resampledData = resampleAudio(inputData, audioContext.sampleRate, 24000);
         
-        // Convert Float32Array to Int16Array
-        const pcmBuffer = new Int16Array(resampledData.length);
-        for (let i = 0; i < resampledData.length; i++) {
-          pcmBuffer[i] = Math.max(-32768, Math.min(32767, Math.floor(resampledData[i] * 32767)));
-        }
-        
-        sendAudioChunk(pcmBuffer.buffer);
+        sendAudioChunk(resampledData);
       };
 
       microphone.connect(scriptNode);
@@ -197,6 +206,21 @@ export const InterviewDashboard: FC = () => {
             setIsCameraAvailable(true);
           } else {
             setIsCameraAvailable(false);
+          }
+          
+          if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+            wsRef.current.send(JSON.stringify({
+              type: 'session.update',
+              session: {
+                turn_detection: { type: 'server_vad' },
+                input_audio_format: 'pcm16',
+                output_audio_format: 'pcm16',
+                voice: 'alloy',
+                instructions: 'You are an AI-powered interview assistant. Conduct a professional interview, asking relevant questions and providing constructive feedback.',
+                modalities: ["text", "audio"],
+                temperature: 0.8,
+              }
+            }));
           }
           
           setIsInterviewStarted(true);
@@ -356,13 +380,16 @@ export const InterviewDashboard: FC = () => {
       };
 
       ws.onmessage = (event) => {
-        console.log('Received WebSocket message:', event.data);
+        console.log('Received WebSocket message:');
         const message = JSON.parse(event.data);
         if (message.type === 'response.audio.delta' && message.delta) {
-          const audioBlob = new Blob([Buffer.from(message.delta, 'base64')], { type: 'audio/wav' });
+          const audioBlob = new Blob([Buffer.from(message.delta, 'base64')], { type: 'audio/l16' });
           setAudioQueue(prevQueue => [...prevQueue, audioBlob]);
         } else if (message.type === 'response.text.delta' && message.delta) {
           setTranscription(prev => prev + message.delta.text);
+        } else if (message.type === 'error') {
+          console.error('OpenAI API error:', message.error);
+          toast.error(`API error: ${message.error.message}`);
         }
       };
 
@@ -401,7 +428,10 @@ export const InterviewDashboard: FC = () => {
       
       if (audioRef.current) {
         audioRef.current.src = audioUrl;
-        audioRef.current.play();
+        audioRef.current.play().catch(error => {
+          console.error('Error playing audio:', error);
+          toast.error('Error playing audio');
+        });
       }
 
       setAudioQueue(prevQueue => prevQueue.slice(1));
@@ -518,7 +548,15 @@ export const InterviewDashboard: FC = () => {
           </div>
         </div>
       </div>
-      <audio ref={audioRef} onEnded={playNextAudio} style={{ display: 'none' }} />
+      <audio 
+        ref={audioRef} 
+        onEnded={playNextAudio} 
+        onError={(e) => {
+          console.error('Audio playback error:', e);
+          toast.error('Audio playback error');
+        }}
+        style={{ display: 'none' }} 
+      />
     </>
   );
 };

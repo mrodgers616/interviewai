@@ -71,8 +71,8 @@ app.prepare().then(() => {
         type: 'session.update',
         session: {
           turn_detection: { type: 'server_vad' },
-          input_audio_format: 'pcm16',  // Changed from 'pcm_16000' to 'pcm16'
-          output_audio_format: 'pcm16', // Changed from 'pcm_16000' to 'pcm16'
+          input_audio_format: 'pcm16',
+          output_audio_format: 'pcm16',
           voice: VOICE,
           instructions: SYSTEM_MESSAGE,
           modalities: ["text", "audio"],
@@ -107,34 +107,26 @@ app.prepare().then(() => {
     ws.on('message', (message) => {
       console.log('[WebSocket] Received message from client');
       try {
-        if (Buffer.isBuffer(message)) {
+        const data = JSON.parse(message.toString());
+        if (data.type === 'audio' && openAiWs.readyState === WebSocket.OPEN) {
           const audioAppend = {
             type: 'input_audio_buffer.append',
-            audio: message.toString('base64')
+            audio: data.data // This is already base64 encoded
           };
           openAiWs.send(JSON.stringify(audioAppend));
-        } else {
-          const data = JSON.parse(message.toString());
-          if (data.type === 'audio' && openAiWs.readyState === WebSocket.OPEN) {
-            const audioAppend = {
-              type: 'input_audio_buffer.append',
-              audio: data.data
-            };
-            openAiWs.send(JSON.stringify(audioAppend));
-          } else if (data.type === 'text' && openAiWs.readyState === WebSocket.OPEN) {
-            const textMessage = {
-              type: 'conversation.item.create',
-              item: {
-                type: 'message',
-                role: 'user',
-                content: [{
-                  type: 'input_text',
-                  text: data.data
-                }]
-              }
-            };
-            openAiWs.send(JSON.stringify(textMessage));
-          }
+        } else if (data.type === 'text' && openAiWs.readyState === WebSocket.OPEN) {
+          const textMessage = {
+            type: 'conversation.item.create',
+            item: {
+              type: 'message',
+              role: 'user',
+              content: [{
+                type: 'input_text',
+                text: data.data
+              }]
+            }
+          };
+          openAiWs.send(JSON.stringify(textMessage));
         }
       } catch (error) {
         console.error('[WebSocket] Error processing message:', error);
