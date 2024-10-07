@@ -8,16 +8,11 @@ import { TimerDisplay } from "./TimerDisplay";
 import { ControlButtons } from "./ControlButtons";
 import { TranscriptionDisplay } from "./TranscriptionDisplay";
 import debounce from 'lodash/debounce';
-import Fastify from 'fastify';
-import WebSocket from 'ws';
-import fastifyFormBody from '@fastify/formbody';
-import fastifyWs from '@fastify/websocket';
+import { toast } from 'react-hot-toast';
 
-// Add a new utility function to update the system status
 const updateSystemStatus = (setSystemStatus: React.Dispatch<React.SetStateAction<"idle" | "listening" | "processing" | "speaking">>, status: "idle" | "listening" | "processing" | "speaking") => {
   setSystemStatus(status);
 };
-
 
 export const InterviewDashboard: FC = () => {
   const { OPENAI_API_KEY } = process.env;
@@ -45,49 +40,20 @@ export const InterviewDashboard: FC = () => {
   const timerIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const recognitionRef = useRef<any>(null);
   const lastTranscriptRef = useRef<string>("");
-  const fastify = Fastify();
-  fastify.register(fastifyFormBody);
-  fastify.register(fastifyWs);
+  const [audioQueue, setAudioQueue] = useState<Blob[]>([]);
+  const audioRef = useRef<HTMLAudioElement>(null);
+  const wsRef = useRef<WebSocket | null>(null);
+  const [wsStatus, setWsStatus] = useState<'connecting' | 'open' | 'closed'>('closed');
 
-  const SYSTEM_MESSAGE = `You are an advanced AI-powered interview assistant designed to conduct realistic and insightful job interviews. Your role is to: 1. Ask relevant and challenging questions based on the specific job role and industry. 2. Adapt your questioning style and difficulty level based on the candidates responses. 3. Provide a natural, conversational flow to the interview, including appropriate follow-up questions. 4. Assess the candidates responses in real-time, considering factors such as relevance, depth, clarity, and problem-solving skills. 5. Maintain a professional and encouraging demeanor throughout the interview. 6. Avoid interrupting the candidate while they are speaking. 7. Provide brief, constructive feedback or ask for clarification when appropriate. 8. Keep track of the interview's progress and ensure all key areas are covered within the allotted time. 9. Conclude the interview with a summary and an opportunity for the candidate to ask questions. Remember to tailor your language and tone to match the seniority level of the position and the company culture. Your goal is to create a realistic interview experience that helps candidates improve their skills and confidence.`;
-  const VOICE = 'alloy';
-
-  const openAiWs = new WebSocket('wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview-2024-10-01', {
-    headers: {
-        Authorization: `Bearer ${OPENAI_API_KEY}`,
-        "OpenAI-Beta": "realtime=v1"
+  const sendAudioChunk = useCallback((audioChunk: ArrayBuffer) => {
+    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+      const base64Audio = btoa(String.fromCharCode.apply(null, Array.from(new Uint8Array(audioChunk))));
+      wsRef.current.send(JSON.stringify({
+        type: 'audio',
+        data: base64Audio
+      }));
     }
-  });
-
-  const LOG_EVENT_TYPES = [
-    'response.content.done',
-    'rate_limits.updated',
-    'response.done',
-    'input_audio_buffer.committed',
-    'input_audio_buffer.speech_stopped',
-    'input_audio_buffer.speech_started',
-    'session.created'
-  ];
-
-  let streamSid = null;
-
-  const sendSessionUpdate = () => {
-    const sessionUpdate = {
-        type: 'session.update',
-        session: {
-            turn_detection: { type: 'server_vad' },
-            input_audio_format: 'g711_ulaw',
-            output_audio_format: 'g711_ulaw',
-            voice: VOICE,
-            instructions: SYSTEM_MESSAGE,
-            modalities: ["text", "audio"],
-            temperature: 0.8,
-        }
-    };
-
-    console.log('Sending session update:', JSON.stringify(sessionUpdate));
-    openAiWs.send(JSON.stringify(sessionUpdate));
-  };
+  }, []);
 
   const setDebouncedSystemStatus = useCallback(
     debounce((status: "idle" | "listening" | "processing" | "speaking") => {
@@ -96,19 +62,10 @@ export const InterviewDashboard: FC = () => {
     []
   );
 
-  const debouncedSendTranscriptionToLLM = useCallback(
-    debounce((text: string) => {
-      if (!isUserSpeaking && !isSpeaking) {
-        sendTranscriptionToLLM(text);
-      }
-    }, 1000), // Reduced debounce time to 1 second
-    [isUserSpeaking, isSpeaking]
-  );
-
   useEffect(() => {
     if (isMicOn && stream) {
       if (!audioContextRef.current) {
-        audioContextRef.current = new AudioContext();
+        audioContextRef.current = new AudioContext({ sampleRate: 24000 });
       }
       const audioContext = audioContextRef.current;
       const analyser = audioContext.createAnalyser();
@@ -122,7 +79,7 @@ export const InterviewDashboard: FC = () => {
         analyser.getByteFrequencyData(dataArray);
         const average = dataArray.reduce((sum, value) => sum + value, 0) / dataArray.length;
         setAudioLevel(average);
-        const newIsAudioActive = average > 20; // Increased threshold
+        const newIsAudioActive = average > 20;
         setIsAudioActive(newIsAudioActive);
         setIsUserSpeaking(newIsAudioActive);
 
@@ -136,12 +93,8 @@ export const InterviewDashboard: FC = () => {
           if (!silenceTimeoutRef.current) {
             silenceTimeoutRef.current = setTimeout(() => {
               setIsUserSpeaking(false);
-              if (lastTranscriptRef.current.trim() !== transcription.trim()) {
-                lastTranscriptRef.current = transcription;
-                debouncedSendTranscriptionToLLM(transcription);
-              }
               silenceTimeoutRef.current = null;
-            }, 1000); // Reduced silence time to 1 second
+            }, 1000);
           }
         }
 
@@ -152,32 +105,40 @@ export const InterviewDashboard: FC = () => {
 
       updateAudioLevel();
 
-      // Set up MediaRecorder for streaming audio
-      const mediaRecorder = new MediaRecorder(stream);
-      mediaRecorderRef.current = mediaRecorder;
-
-      mediaRecorder.ondataavailable = (event) => {
-        if (event.data.size > 0) {
-          audioChunksRef.current.push(event.data);
+      // Set up ScriptProcessorNode for streaming audio
+      const scriptNode = audioContext.createScriptProcessor(4096, 1, 1);
+      scriptNode.onaudioprocess = (audioProcessingEvent) => {
+        const inputBuffer = audioProcessingEvent.inputBuffer;
+        const inputData = inputBuffer.getChannelData(0);
+        
+        // Resample to 24kHz if necessary
+        const resampledData = resampleAudio(inputData, audioContext.sampleRate, 24000);
+        
+        // Convert Float32Array to Int16Array
+        const pcmBuffer = new Int16Array(resampledData.length);
+        for (let i = 0; i < resampledData.length; i++) {
+          pcmBuffer[i] = Math.max(-32768, Math.min(32767, Math.floor(resampledData[i] * 32767)));
         }
+        
+        sendAudioChunk(pcmBuffer.buffer);
       };
 
-      mediaRecorder.start(100); // Collect data every 100ms
-    }
+      microphone.connect(scriptNode);
+      scriptNode.connect(audioContext.destination);
 
-    return () => {
-      if (audioContextRef.current) {
-        audioContextRef.current.close();
-        audioContextRef.current = null;
-      }
-      if (mediaRecorderRef.current) {
-        mediaRecorderRef.current.stop();
-      }
-      if (silenceTimeoutRef.current) {
-        clearTimeout(silenceTimeoutRef.current);
-      }
-    };
-  }, [isMicOn, stream, isInterviewStarted, transcription, setDebouncedSystemStatus, debouncedSendTranscriptionToLLM]);
+      return () => {
+        scriptNode.disconnect();
+        microphone.disconnect();
+        if (audioContextRef.current) {
+          audioContextRef.current.close();
+          audioContextRef.current = null;
+        }
+        if (silenceTimeoutRef.current) {
+          clearTimeout(silenceTimeoutRef.current);
+        }
+      };
+    }
+  }, [isMicOn, stream, isInterviewStarted, setDebouncedSystemStatus, sendAudioChunk]);
 
   useEffect(() => {
     if (isInterviewStarted) {
@@ -200,146 +161,36 @@ export const InterviewDashboard: FC = () => {
 
   const startMedia = async () => {
     setIsLoading(true);
-    fastify.register(async (fastify) => {
-      fastify.get('/media-stream', { websocket: true }, (connection, req) => {
-          console.log('Client connected');
-  
-  
-          const openAiWs = new WebSocket('wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview-2024-10-01', {
-              headers: {
-                  Authorization: `Bearer ${OPENAI_API_KEY}`,
-                  "OpenAI-Beta": "realtime=v1"
-              }
-          });
-  
-          let streamSid: any = null;
-  
-          const sendSessionUpdate = () => {
-              const sessionUpdate = {
-                  type: 'session.update',
-                  session: {
-                      turn_detection: { type: 'server_vad' },
-                      input_audio_format: 'g711_ulaw',
-                      output_audio_format: 'g711_ulaw',
-                      voice: VOICE,
-                      instructions: SYSTEM_MESSAGE,
-                      modalities: ["text", "audio"],
-                      temperature: 0.8,
-                  }
-              };
-  
-              console.log('Sending session update:', JSON.stringify(sessionUpdate));
-              openAiWs.send(JSON.stringify(sessionUpdate));
-          };
-  
-          // Open event for OpenAI WebSocket
-          openAiWs.on('open', () => {
-              console.log('Connected to the OpenAI Realtime API');
-              setTimeout(sendSessionUpdate, 250); // Ensure connection stability, send after .25 seconds
-          });
-  
-          // Listen for messages from the OpenAI WebSocket (and send to Twilio if necessary)
-          openAiWs.on('message', (data: any) => {
-              try {
-                  const response = JSON.parse(data);
-  
-                  if (response.type === 'input_audio_buffer.speech_started') {
-                      console.log('User started speaking');
-                      const clearMessage = {
-                          event: 'clear',
-                          streamSid: streamSid,
-                      };
-                      connection.send(JSON.stringify(clearMessage));
-                  }
-  
-                  if (LOG_EVENT_TYPES.includes(response.type)) {
-                      console.log(`Received event: ${response.type}`, response);
-                  }
-  
-                  if (response.type === 'session.updated') {
-                      console.log('Session updated successfully:', response);
-                  }
-  
-                  if (response.type === 'response.audio.delta' && response.delta) {
-                      const audioDelta = {
-                          event: 'media',
-                          streamSid: streamSid,
-                          media: { payload: Buffer.from(response.delta, 'base64').toString('base64') }
-                      };
-                      connection.send(JSON.stringify(audioDelta));
-                  }
-              } catch (error) {
-                  console.error('Error processing OpenAI message:', error, 'Raw message:', data);
-              }
-          });
-  
-          // Handle incoming messages from Twilio
-          connection.on('message', (message: any) => {
-              try {
-                  const data = JSON.parse(message);
-  
-                  switch (data.event) {
-                      case 'media':
-                          if (openAiWs.readyState === WebSocket.OPEN) {
-                              const audioAppend = {
-                                  type: 'input_audio_buffer.append',
-                                  audio: data.media.payload
-                              };
-  
-                              openAiWs.send(JSON.stringify(audioAppend));
-                          }
-                          break;
-                      case 'start':
-                          streamSid = data.start.streamSid;
-                          console.log('Incoming stream has started', streamSid);
-                          break;
-                      default:
-                          console.log('Received non-media event:', data.event);
-                          break;
-                  }
-              } catch (error) {
-                  console.error('Error parsing message:', error, 'Message:', message);
-              }
-          });
-  
-          // Handle connection close
-          connection.on('close', () => {
-              if (openAiWs.readyState === WebSocket.OPEN) openAiWs.close();
-              console.log('Client disconnected.');
-          });
-  
-          // Handle WebSocket close and errors
-          openAiWs.on('close', () => {
-              console.log('Disconnected from the OpenAI Realtime API');
-          });
-  
-          openAiWs.on('error', (error) => {
-              console.error('Error in the OpenAI WebSocket:', error);
-          });
-      });
-  });
     try {
       const mediaStream = await navigator.mediaDevices.getUserMedia({
-        audio: true,
+        audio: {
+          sampleRate: 16000,
+          channelCount: 1,
+          echoCancellation: true,
+          noiseSuppression: true,
+        },
         video: true,
       }).catch(() => {
-        // If video fails, try audio only
-        return navigator.mediaDevices.getUserMedia({ audio: true });
+        return navigator.mediaDevices.getUserMedia({ 
+          audio: {
+            sampleRate: 16000,
+            channelCount: 1,
+            echoCancellation: true,
+            noiseSuppression: true,
+          }
+        });
       });
 
       if (mediaStream) {
         const audioTracks = mediaStream.getAudioTracks();
         const videoTracks = mediaStream.getVideoTracks();
-        sendSessionUpdate();
         
         if (audioTracks.length > 0) {
           setStream(mediaStream);
           setIsMicOn(true);
-          // Ensure the microphone is unmuted
           audioTracks.forEach(track => {
             track.enabled = true;
           });
-          startSpeechRecognition();
           
           if (videoTracks.length > 0) {
             setIsCameraOn(true);
@@ -350,22 +201,13 @@ export const InterviewDashboard: FC = () => {
           
           setIsInterviewStarted(true);
           setDebouncedSystemStatus("listening");
-          // Set initial question
-          // setCurrentQuestion("Tell me about yourself and your background.");
-          // speakQuestion("Tell me about yourself and your background.");
-
-          
-          
         } else {
           console.error("Failed to start microphone");
           mediaStream.getTracks().forEach(track => track.stop());
         }
-      } 
-      else {
+      } else {
         console.error("Failed to get media stream");
       }
-
-      
     } catch (error) {
       console.error("Error accessing media devices:", error);
     } finally {
@@ -407,10 +249,6 @@ export const InterviewDashboard: FC = () => {
           setIsUserSpeaking(true);
           setDebouncedSystemStatus("listening");
           
-          // Trigger LLM call when there's a final result
-          if (event.results[event.results.length - 1].isFinal) {
-            debouncedSendTranscriptionToLLM(currentTranscript);
-          }
         };
 
         recognition.onerror = (event: any) => {
@@ -498,79 +336,100 @@ export const InterviewDashboard: FC = () => {
     }
   };
 
-  const sendTranscriptionToLLM = async (text: string) => {
-    console.log("Sending transcription to LLM:", text);
-    if (isUserSpeaking || isSpeaking) return;
-    
-    setDebouncedSystemStatus("processing");
-    try {
-      const response = await fetch('/api/llm', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ text }),
-      });
-      
-      if (!response.ok) {
-        throw new Error('Failed to get response from LLM');
-      }
-      
-      const data = await response.json();
-      console.log("LLM response:", data);
-      if (data.question) {
-        setCurrentQuestion(data.question);
-        setIsQuestionRead(false);
-        setDebouncedSystemStatus("speaking");
-        speakQuestion(data.question);
-      } else {
-        throw new Error('No question received from LLM');
-      }
-    } catch (error) {
-      console.error('Error sending transcription to LLM:', error);
-      setDebouncedSystemStatus("idle");
-    }
-  };
-
-  const speakQuestion = (question: string) => {
-    if ('speechSynthesis' in window && !isQuestionRead && !isUserSpeaking) {
-      // Cancel any ongoing speech
-      window.speechSynthesis.cancel();
-
-      const utterance = new SpeechSynthesisUtterance(question);
-      utterance.onstart = () => {
-        setIsQuestionRead(true);
-        setIsSpeaking(true);
-        setDebouncedSystemStatus("speaking");
-        // Mute the microphone while speaking
-        if (stream) {
-          stream.getAudioTracks().forEach(track => {
-            track.enabled = false;
-          });
-        }
-      };
-      utterance.onend = () => {
-        setIsQuestionRead(true);
-        setIsSpeaking(false);
-        setDebouncedSystemStatus("listening");
-        setTranscription(""); // Clear the transcription for the new question
-        lastTranscriptRef.current = ""; // Reset the last transcript
-        // Unmute the microphone after speaking
-        if (stream) {
-          stream.getAudioTracks().forEach(track => {
-            track.enabled = true;
-          });
-        }
-      };
-      window.speechSynthesis.speak(utterance);
-    } else if (!('speechSynthesis' in window)) {
-      console.error('Text-to-speech not supported');
-      setDebouncedSystemStatus("idle");
-    }
-  };
-
   const toggleTimer = () => {
     setIsTimerEnabled(!isTimerEnabled);
+  };
+
+  useEffect(() => {
+    const connectWebSocket = () => {
+      const wsUrl = `ws://${window.location.hostname}:3001/api/realtime-api`;
+      console.log('Attempting to connect to WebSocket:', wsUrl);
+      
+      const ws = new WebSocket(wsUrl);
+      wsRef.current = ws;
+      setWsStatus('connecting');
+
+      ws.onopen = () => {
+        console.log('Connected to server WebSocket');
+        setWsStatus('open');
+        toast.success('Connected to interview server');
+      };
+
+      ws.onmessage = (event) => {
+        console.log('Received WebSocket message:', event.data);
+        const message = JSON.parse(event.data);
+        if (message.type === 'response.audio.delta' && message.delta) {
+          const audioBlob = new Blob([Buffer.from(message.delta, 'base64')], { type: 'audio/wav' });
+          setAudioQueue(prevQueue => [...prevQueue, audioBlob]);
+        } else if (message.type === 'response.text.delta' && message.delta) {
+          setTranscription(prev => prev + message.delta.text);
+        }
+      };
+
+      ws.onclose = (event) => {
+        console.log('WebSocket closed:', event);
+        setWsStatus('closed');
+        toast.error(`Disconnected from interview server (Code: ${event.code}). Attempting to reconnect...`);
+        setTimeout(connectWebSocket, 5000);
+      };
+
+      ws.onerror = (error) => {
+        console.error('WebSocket error:', error);
+        toast.error('Error connecting to interview server');
+      };
+    };
+
+    connectWebSocket();
+
+    return () => {
+      if (wsRef.current) {
+        wsRef.current.close();
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (audioQueue.length > 0 && !audioRef.current?.src) {
+      playNextAudio();
+    }
+  }, [audioQueue]);
+
+  const playNextAudio = useCallback(() => {
+    if (audioQueue.length > 0) {
+      const audioBlob = audioQueue[0];
+      const audioUrl = URL.createObjectURL(audioBlob);
+      
+      if (audioRef.current) {
+        audioRef.current.src = audioUrl;
+        audioRef.current.play();
+      }
+
+      setAudioQueue(prevQueue => prevQueue.slice(1));
+    }
+  }, [audioQueue]);
+
+  // Add this new function for resampling audio
+  const resampleAudio = (audioBuffer: Float32Array, fromSampleRate: number, toSampleRate: number): Float32Array => {
+    if (fromSampleRate === toSampleRate) {
+      return audioBuffer;
+    }
+    const ratio = fromSampleRate / toSampleRate;
+    const newLength = Math.round(audioBuffer.length / ratio);
+    const result = new Float32Array(newLength);
+    let offsetResult = 0;
+    let offsetBuffer = 0;
+    while (offsetResult < result.length) {
+      const nextOffsetBuffer = Math.round((offsetResult + 1) * ratio);
+      let accum = 0, count = 0;
+      for (let i = offsetBuffer; i < nextOffsetBuffer && i < audioBuffer.length; i++) {
+        accum += audioBuffer[i];
+        count++;
+      }
+      result[offsetResult] = accum / count;
+      offsetResult++;
+      offsetBuffer = nextOffsetBuffer;
+    }
+    return result;
   };
 
   return (
@@ -630,6 +489,9 @@ export const InterviewDashboard: FC = () => {
               <div className="text-center text-lg font-semibold mb-4">
                 System Status: {systemStatus}
               </div>
+              <div className="text-center text-sm mb-2">
+                WebSocket Status: {wsStatus}
+              </div>
               <TranscriptionDisplay
                 transcription={transcription}
                 currentQuestion={currentQuestion}
@@ -656,6 +518,7 @@ export const InterviewDashboard: FC = () => {
           </div>
         </div>
       </div>
+      <audio ref={audioRef} onEnded={playNextAudio} style={{ display: 'none' }} />
     </>
   );
 };

@@ -10,7 +10,7 @@ import {
 import { GithubIcon } from "lucide-react";
 import { FC, useState } from "react";
 import { useAuth } from "reactfire";
-import { getFirestore, doc, setDoc, serverTimestamp } from "firebase/firestore";
+import { getFirestore, doc, setDoc, serverTimestamp, getDoc, updateDoc } from "firebase/firestore";
 
 
 interface Props {
@@ -25,20 +25,34 @@ export const ProviderLoginButtons: FC<Props> = ({ onSignIn }) => {
     try {
       setIsLoading(true);
       await signInWithPopup(auth, provider);
-      // create user in your database here
-      // Create user in Firestore
+      // Update or create user in Firestore
       const db = getFirestore();
       const userRef = doc(db, "users", auth.currentUser!.uid);
-      await setDoc(userRef, {
-        email: auth.currentUser!.email,
-        displayName: auth.currentUser!.displayName,
-        photoURL: auth.currentUser!.photoURL,
-        createdAt: serverTimestamp(),
-        paid: false,
-        interviewCount: 0,
-        averageScore: 0,
-        skillsimproved: 0,
-      }, { merge: true });
+      const userSnapshot = await getDoc(userRef);
+      
+      if (userSnapshot.exists()) {
+        // Update existing user document
+        await updateDoc(userRef, {
+          email: auth.currentUser!.email,
+          displayName: auth.currentUser!.displayName,
+          photoURL: auth.currentUser!.photoURL,
+          lastSignInTime: serverTimestamp(),
+        });
+      } else {
+        // Create new user document
+        await setDoc(userRef, {
+          email: auth.currentUser!.email,
+          displayName: auth.currentUser!.displayName,
+          photoURL: auth.currentUser!.photoURL,
+          createdAt: serverTimestamp(),
+          lastSignInTime: serverTimestamp(),
+          paid: false,
+          interviewCount: 0,
+          averageScore: 0,
+          skillsimproved: 0,
+        });
+      }
+      
       toast({ title: "Signed in!" });
       onSignIn?.();
     } catch (err: any) {
