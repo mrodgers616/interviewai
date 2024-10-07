@@ -41,8 +41,8 @@ export const InterviewDashboard: FC = () => {
   const timerIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const recognitionRef = useRef<any>(null);
   const lastTranscriptRef = useRef<string>("");
-  const [audioQueue, setAudioQueue] = useState<Blob[]>([]);
-  const audioRef = useRef<HTMLAudioElement>(null);
+  const [audioQueue, setAudioQueue] = useState<ArrayBuffer[]>([]);
+  const [isPlaying, setIsPlaying] = useState(false);
   const wsRef = useRef<WebSocket | null>(null);
   const [wsStatus, setWsStatus] = useState<'connecting' | 'open' | 'closed'>('closed');
 
@@ -76,6 +76,14 @@ export const InterviewDashboard: FC = () => {
       wsRef.current.send(JSON.stringify({ type: 'input_audio_buffer.commit' }));
     }
   }, []);
+
+  useEffect(() => {
+    // Initialize audio context here
+    if (!audioContextRef.current) {
+      audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+      console.log('Audio context initialized');
+    }
+  }, []); // Empty dependency array ensures this runs once on component mount
 
   useEffect(() => {
     if (isMicOn && stream) {
@@ -380,16 +388,20 @@ export const InterviewDashboard: FC = () => {
       };
 
       ws.onmessage = (event) => {
-        console.log('Received WebSocket message:');
+        console.log('Received WebSocket message:', event.data);
         const message = JSON.parse(event.data);
-        if (message.type === 'response.audio.delta' && message.delta) {
-          const audioBlob = new Blob([Buffer.from(message.delta, 'base64')], { type: 'audio/l16' });
-          setAudioQueue(prevQueue => [...prevQueue, audioBlob]);
-        } else if (message.type === 'response.text.delta' && message.delta) {
-          setTranscription(prev => prev + message.delta.text);
+        if (message.type === 'audio' && message.data) {
+          console.log('Received audio data, length:', message.data.length);
+          const audioArrayBuffer = base64ToArrayBuffer(message.data);
+          setAudioQueue(prevQueue => [...prevQueue, audioArrayBuffer]);
+          console.log('Audio queue length:', audioQueue.length + 1);
+        } else if (message.type === 'text' && message.data) {
+          setTranscription(prev => prev + message.data);
         } else if (message.type === 'error') {
           console.error('OpenAI API error:', message.error);
           toast.error(`API error: ${message.error.message}`);
+        } else {
+          console.log('Unhandled message type:', message.type);
         }
       };
 
@@ -416,27 +428,112 @@ export const InterviewDashboard: FC = () => {
   }, []);
 
   useEffect(() => {
-    if (audioQueue.length > 0 && !audioRef.current?.src) {
+    if (audioQueue.length > 0 && !isPlaying) {
       playNextAudio();
     }
-  }, [audioQueue]);
+  }, [audioQueue, isPlaying]);
 
   const playNextAudio = useCallback(() => {
-    if (audioQueue.length > 0) {
-      const audioBlob = audioQueue[0];
-      const audioUrl = URL.createObjectURL(audioBlob);
+    if (audioQueue.length > 0 && !isPlaying) {
+      setIsPlaying(true);
+      console.log('Playing next audio chunk');
+      const audioData = audioQueue[0];
       
-      if (audioRef.current) {
-        audioRef.current.src = audioUrl;
-        audioRef.current.play().catch(error => {
-          console.error('Error playing audio:', error);
-          toast.error('Error playing audio');
-        });
+      if (!audioContextRef.current) {
+        console.log('Initializing audio context');
+        audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
       }
-
-      setAudioQueue(prevQueue => prevQueue.slice(1));
+      
+      const audioContext = audioContextRef.current;
+      
+      // Log information about the audio data
+      console.log('Audio data type:', typeof audioData);
+      console.log('Audio data length:', audioData.byteLength);
+      
+      // Ensure the audio context is in a running state
+      if (audioContext.state !== 'running') {
+        audioContext.resume().then(() => {
+          decodeAndPlayAudio(audioContext, audioData);
+        });
+      } else {
+        decodeAndPlayAudio(audioContext, audioData);
+      }
+    } else {
+      console.log('Audio queue is empty or audio is already playing');
     }
-  }, [audioQueue]);
+  }, [audioQueue, isPlaying]);
+
+  const decodeAndPlayAudio = (audioContext: AudioContext, audioData: ArrayBuffer) => {
+    // Convert PCM data to WAV
+    const wavData = pcmToWav(audioData);
+    
+    audioContext.decodeAudioData(wavData, (buffer) => {
+      console.log('Audio data decoded successfully');
+      const source = audioContext.createBufferSource();
+      source.buffer = buffer;
+      source.connect(audioContext.destination);
+      source.onended = () => {
+        console.log('Audio chunk playback ended');
+        setIsPlaying(false);
+        setAudioQueue(prevQueue => prevQueue.slice(1));
+      };
+      source.start(0);
+      console.log('Started playing audio chunk');
+    }, (error) => {
+      console.error('Error decoding audio data:', error);
+      toast.error('Error decoding audio');
+      setIsPlaying(false);
+      setAudioQueue(prevQueue => prevQueue.slice(1));
+    });
+  };
+
+  // Function to convert PCM to WAV
+  function pcmToWav(pcmData: ArrayBuffer): ArrayBuffer {
+    const wavHeader = new ArrayBuffer(44);
+    const view = new DataView(wavHeader);
+    
+    // RIFF chunk descriptor
+    writeString(view, 0, 'RIFF');
+    view.setUint32(4, 36 + pcmData.byteLength, true);
+    writeString(view, 8, 'WAVE');
+    
+    // fmt sub-chunk
+    writeString(view, 12, 'fmt ');
+    view.setUint32(16, 16, true);
+    view.setUint16(20, 1, true);
+    view.setUint16(22, 1, true);
+    view.setUint32(24, 24000, true);
+    view.setUint32(28, 48000, true);
+    view.setUint16(32, 2, true);
+    view.setUint16(34, 16, true);
+    
+    // data sub-chunk
+    writeString(view, 36, 'data');
+    view.setUint32(40, pcmData.byteLength, true);
+    
+    const wavFile = new Uint8Array(wavHeader.byteLength + pcmData.byteLength);
+    wavFile.set(new Uint8Array(wavHeader), 0);
+    wavFile.set(new Uint8Array(pcmData), wavHeader.byteLength);
+    
+    return wavFile.buffer;
+  }
+
+  function writeString(view: DataView, offset: number, string: string) {
+    for (let i = 0; i < string.length; i++) {
+      view.setUint8(offset + i, string.charCodeAt(i));
+    }
+  }
+
+  const base64ToArrayBuffer = (base64: string): ArrayBuffer => {
+    console.log('Converting base64 to ArrayBuffer');
+    const binaryString = window.atob(base64);
+    const len = binaryString.length;
+    const bytes = new Uint8Array(len);
+    for (let i = 0; i < len; i++) {
+      bytes[i] = binaryString.charCodeAt(i);
+    }
+    return bytes.buffer;
+  };
 
   // Add this new function for resampling audio
   const resampleAudio = (audioBuffer: Float32Array, fromSampleRate: number, toSampleRate: number): Float32Array => {
@@ -548,15 +645,6 @@ export const InterviewDashboard: FC = () => {
           </div>
         </div>
       </div>
-      <audio 
-        ref={audioRef} 
-        onEnded={playNextAudio} 
-        onError={(e) => {
-          console.error('Audio playback error:', e);
-          toast.error('Audio playback error');
-        }}
-        style={{ display: 'none' }} 
-      />
     </>
   );
 };
