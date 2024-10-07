@@ -8,6 +8,10 @@ import { TimerDisplay } from "./TimerDisplay";
 import { ControlButtons } from "./ControlButtons";
 import { TranscriptionDisplay } from "./TranscriptionDisplay";
 import debounce from 'lodash/debounce';
+import Fastify from 'fastify';
+import WebSocket from 'ws';
+import fastifyFormBody from '@fastify/formbody';
+import fastifyWs from '@fastify/websocket';
 
 // Add a new utility function to update the system status
 const updateSystemStatus = (setSystemStatus: React.Dispatch<React.SetStateAction<"idle" | "listening" | "processing" | "speaking">>, status: "idle" | "listening" | "processing" | "speaking") => {
@@ -16,6 +20,7 @@ const updateSystemStatus = (setSystemStatus: React.Dispatch<React.SetStateAction
 
 
 export const InterviewDashboard: FC = () => {
+  const { OPENAI_API_KEY } = process.env;
   const [isMicOn, setIsMicOn] = useState(false);
   const [isCameraOn, setIsCameraOn] = useState(false);
   const [stream, setStream] = useState<MediaStream | null>(null);
@@ -40,6 +45,49 @@ export const InterviewDashboard: FC = () => {
   const timerIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const recognitionRef = useRef<any>(null);
   const lastTranscriptRef = useRef<string>("");
+  const fastify = Fastify();
+  fastify.register(fastifyFormBody);
+  fastify.register(fastifyWs);
+
+  const SYSTEM_MESSAGE = `You are an advanced AI-powered interview assistant designed to conduct realistic and insightful job interviews. Your role is to: 1. Ask relevant and challenging questions based on the specific job role and industry. 2. Adapt your questioning style and difficulty level based on the candidates responses. 3. Provide a natural, conversational flow to the interview, including appropriate follow-up questions. 4. Assess the candidates responses in real-time, considering factors such as relevance, depth, clarity, and problem-solving skills. 5. Maintain a professional and encouraging demeanor throughout the interview. 6. Avoid interrupting the candidate while they are speaking. 7. Provide brief, constructive feedback or ask for clarification when appropriate. 8. Keep track of the interview's progress and ensure all key areas are covered within the allotted time. 9. Conclude the interview with a summary and an opportunity for the candidate to ask questions. Remember to tailor your language and tone to match the seniority level of the position and the company culture. Your goal is to create a realistic interview experience that helps candidates improve their skills and confidence.`;
+  const VOICE = 'alloy';
+
+  const openAiWs = new WebSocket('wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview-2024-10-01', {
+    headers: {
+        Authorization: `Bearer ${OPENAI_API_KEY}`,
+        "OpenAI-Beta": "realtime=v1"
+    }
+  });
+
+  const LOG_EVENT_TYPES = [
+    'response.content.done',
+    'rate_limits.updated',
+    'response.done',
+    'input_audio_buffer.committed',
+    'input_audio_buffer.speech_stopped',
+    'input_audio_buffer.speech_started',
+    'session.created'
+  ];
+
+  let streamSid = null;
+
+  const sendSessionUpdate = () => {
+    const sessionUpdate = {
+        type: 'session.update',
+        session: {
+            turn_detection: { type: 'server_vad' },
+            input_audio_format: 'g711_ulaw',
+            output_audio_format: 'g711_ulaw',
+            voice: VOICE,
+            instructions: SYSTEM_MESSAGE,
+            modalities: ["text", "audio"],
+            temperature: 0.8,
+        }
+    };
+
+    console.log('Sending session update:', JSON.stringify(sessionUpdate));
+    openAiWs.send(JSON.stringify(sessionUpdate));
+  };
 
   const setDebouncedSystemStatus = useCallback(
     debounce((status: "idle" | "listening" | "processing" | "speaking") => {
@@ -152,6 +200,124 @@ export const InterviewDashboard: FC = () => {
 
   const startMedia = async () => {
     setIsLoading(true);
+    fastify.register(async (fastify) => {
+      fastify.get('/media-stream', { websocket: true }, (connection, req) => {
+          console.log('Client connected');
+  
+  
+          const openAiWs = new WebSocket('wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview-2024-10-01', {
+              headers: {
+                  Authorization: `Bearer ${OPENAI_API_KEY}`,
+                  "OpenAI-Beta": "realtime=v1"
+              }
+          });
+  
+          let streamSid: any = null;
+  
+          const sendSessionUpdate = () => {
+              const sessionUpdate = {
+                  type: 'session.update',
+                  session: {
+                      turn_detection: { type: 'server_vad' },
+                      input_audio_format: 'g711_ulaw',
+                      output_audio_format: 'g711_ulaw',
+                      voice: VOICE,
+                      instructions: SYSTEM_MESSAGE,
+                      modalities: ["text", "audio"],
+                      temperature: 0.8,
+                  }
+              };
+  
+              console.log('Sending session update:', JSON.stringify(sessionUpdate));
+              openAiWs.send(JSON.stringify(sessionUpdate));
+          };
+  
+          // Open event for OpenAI WebSocket
+          openAiWs.on('open', () => {
+              console.log('Connected to the OpenAI Realtime API');
+              setTimeout(sendSessionUpdate, 250); // Ensure connection stability, send after .25 seconds
+          });
+  
+          // Listen for messages from the OpenAI WebSocket (and send to Twilio if necessary)
+          openAiWs.on('message', (data: any) => {
+              try {
+                  const response = JSON.parse(data);
+  
+                  if (response.type === 'input_audio_buffer.speech_started') {
+                      console.log('User started speaking');
+                      const clearMessage = {
+                          event: 'clear',
+                          streamSid: streamSid,
+                      };
+                      connection.send(JSON.stringify(clearMessage));
+                  }
+  
+                  if (LOG_EVENT_TYPES.includes(response.type)) {
+                      console.log(`Received event: ${response.type}`, response);
+                  }
+  
+                  if (response.type === 'session.updated') {
+                      console.log('Session updated successfully:', response);
+                  }
+  
+                  if (response.type === 'response.audio.delta' && response.delta) {
+                      const audioDelta = {
+                          event: 'media',
+                          streamSid: streamSid,
+                          media: { payload: Buffer.from(response.delta, 'base64').toString('base64') }
+                      };
+                      connection.send(JSON.stringify(audioDelta));
+                  }
+              } catch (error) {
+                  console.error('Error processing OpenAI message:', error, 'Raw message:', data);
+              }
+          });
+  
+          // Handle incoming messages from Twilio
+          connection.on('message', (message: any) => {
+              try {
+                  const data = JSON.parse(message);
+  
+                  switch (data.event) {
+                      case 'media':
+                          if (openAiWs.readyState === WebSocket.OPEN) {
+                              const audioAppend = {
+                                  type: 'input_audio_buffer.append',
+                                  audio: data.media.payload
+                              };
+  
+                              openAiWs.send(JSON.stringify(audioAppend));
+                          }
+                          break;
+                      case 'start':
+                          streamSid = data.start.streamSid;
+                          console.log('Incoming stream has started', streamSid);
+                          break;
+                      default:
+                          console.log('Received non-media event:', data.event);
+                          break;
+                  }
+              } catch (error) {
+                  console.error('Error parsing message:', error, 'Message:', message);
+              }
+          });
+  
+          // Handle connection close
+          connection.on('close', () => {
+              if (openAiWs.readyState === WebSocket.OPEN) openAiWs.close();
+              console.log('Client disconnected.');
+          });
+  
+          // Handle WebSocket close and errors
+          openAiWs.on('close', () => {
+              console.log('Disconnected from the OpenAI Realtime API');
+          });
+  
+          openAiWs.on('error', (error) => {
+              console.error('Error in the OpenAI WebSocket:', error);
+          });
+      });
+  });
     try {
       const mediaStream = await navigator.mediaDevices.getUserMedia({
         audio: true,
@@ -164,6 +330,7 @@ export const InterviewDashboard: FC = () => {
       if (mediaStream) {
         const audioTracks = mediaStream.getAudioTracks();
         const videoTracks = mediaStream.getVideoTracks();
+        sendSessionUpdate();
         
         if (audioTracks.length > 0) {
           setStream(mediaStream);
@@ -184,15 +351,21 @@ export const InterviewDashboard: FC = () => {
           setIsInterviewStarted(true);
           setDebouncedSystemStatus("listening");
           // Set initial question
-          setCurrentQuestion("Tell me about yourself and your background.");
-          speakQuestion("Tell me about yourself and your background.");
+          // setCurrentQuestion("Tell me about yourself and your background.");
+          // speakQuestion("Tell me about yourself and your background.");
+
+          
+          
         } else {
           console.error("Failed to start microphone");
           mediaStream.getTracks().forEach(track => track.stop());
         }
-      } else {
+      } 
+      else {
         console.error("Failed to get media stream");
       }
+
+      
     } catch (error) {
       console.error("Error accessing media devices:", error);
     } finally {
