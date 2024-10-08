@@ -15,6 +15,7 @@ import { toast } from "@/components/ui/use-toast";
 import { getAuth, signOut } from "firebase/auth";
 import { useRouter } from "next/navigation";
 import { useUser } from "reactfire";
+import Link from "next/link";
 
 export function UserNav() {
   const { data } = useUser();
@@ -57,10 +58,12 @@ export function UserNav() {
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
         <DropdownMenuGroup>
-          <DropdownMenuItem>Settings</DropdownMenuItem>
+          <DropdownMenuItem asChild>
+            <Link href="/settings" className="cursor-pointer">Settings</Link>
+          </DropdownMenuItem>
         </DropdownMenuGroup>
         <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={doLogout}>Log out</DropdownMenuItem>
+        <DropdownMenuItem onClick={doLogout} className="cursor-pointer">Log out</DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
   );
