@@ -412,7 +412,7 @@ export const InterviewDashboard: FC = () => {
         } else {
           console.log('Unhandled message type:', message.type);
         }
-      };
+      }; 
 
       ws.onclose = (event) => {
         console.log('WebSocket closed:', event);
