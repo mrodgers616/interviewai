@@ -217,6 +217,7 @@ export const JobApplicationPage: FC = () => {
   const auth = useAuth();
   const db = getFirestore();
   const [config, setConfig] = useState<Config>(defaultConfig);
+  const [inputValues, setInputValues] = useState<Record<string, string>>({});
 
   useEffect(() => {
     const fetchUserConfig = async () => {
@@ -345,13 +346,14 @@ export const JobApplicationPage: FC = () => {
                   {renderInfoIcon("Enter job positions you're interested in, separated by commas")}
                 </h3>
                 <Input
-                  value={config.positions.join(", ")}
-                  onChange={(e) =>
+                  value={inputValues.positions || ''}
+                  onChange={(e) => {
+                    setInputValues({...inputValues, positions: e.target.value});
                     setConfig({
                       ...config,
                       positions: splitAndTrim(e.target.value),
-                    })
-                  }
+                    });
+                  }}
                   placeholder="Enter positions separated by commas"
                 />
               </div>
@@ -401,13 +403,14 @@ export const JobApplicationPage: FC = () => {
                   {renderInfoIcon("Companies to exclude from your job search")}
                 </h3>
                 <Input
-                  value={config.company_blacklist.join(", ")}
-                  onChange={(e) =>
+                  value={inputValues.company_blacklist || ''}
+                  onChange={(e) => {
+                    setInputValues({...inputValues, company_blacklist: e.target.value});
                     setConfig({
                       ...config,
                       company_blacklist: splitAndTrim(e.target.value),
-                    })
-                  }
+                    });
+                  }}
                   placeholder="Enter companies separated by commas"
                 />
               </div>
@@ -419,13 +422,14 @@ export const JobApplicationPage: FC = () => {
                   {renderInfoIcon("Job titles to exclude from your search")}
                 </h3>
                 <Input
-                  value={config.title_blacklist.join(", ")}
-                  onChange={(e) =>
+                  value={inputValues.title_blacklist || ''}
+                  onChange={(e) => {
+                    setInputValues({...inputValues, title_blacklist: e.target.value});
                     setConfig({
                       ...config,
                       title_blacklist: splitAndTrim(e.target.value),
-                    })
-                  }
+                    });
+                  }}
                   placeholder="Enter titles separated by commas"
                 />
               </div>
@@ -800,8 +804,9 @@ export const JobApplicationPage: FC = () => {
                     />
                     <h4 className="font-medium mb-1">Key Responsibilities</h4>
                     <Input
-                      value={experience.key_responsibilities.join(", ")}
+                      value={inputValues[`experience_${index}_responsibilities`] || ''}
                       onChange={(e) => {
+                        setInputValues({...inputValues, [`experience_${index}_responsibilities`]: e.target.value});
                         const newExperienceDetails = [...config.experience_details];
                         newExperienceDetails[index].key_responsibilities = splitAndTrim(e.target.value);
                         setConfig({...config, experience_details: newExperienceDetails});
@@ -811,8 +816,9 @@ export const JobApplicationPage: FC = () => {
                     />
                     <h4 className="font-medium mb-1">Skills Acquired</h4>
                     <Input
-                      value={experience.skills_acquired.join(", ")}
+                      value={inputValues[`experience_${index}_skills`] || ''}
                       onChange={(e) => {
+                        setInputValues({...inputValues, [`experience_${index}_skills`]: e.target.value});
                         const newExperienceDetails = [...config.experience_details];
                         newExperienceDetails[index].skills_acquired = splitAndTrim(e.target.value);
                         setConfig({...config, experience_details: newExperienceDetails});
@@ -852,8 +858,9 @@ export const JobApplicationPage: FC = () => {
                   {renderInfoIcon("Notable projects you have worked on, including personal or professional projects")}
                 </h3>
                 <Input
-                  value={config.projects.map(project => project.name).join(", ")}
-                  onChange={(e) =>
+                  value={inputValues.projects || ''}
+                  onChange={(e) => {
+                    setInputValues({...inputValues, projects: e.target.value});
                     setConfig({
                       ...config,
                       projects: splitAndTrim(e.target.value).map((s) => ({
@@ -861,8 +868,8 @@ export const JobApplicationPage: FC = () => {
                         description: '',
                         link: ''
                       })),
-                    })
-                  }
+                    });
+                  }}
                   placeholder="Enter projects separated by commas"
                 />
               </div>
