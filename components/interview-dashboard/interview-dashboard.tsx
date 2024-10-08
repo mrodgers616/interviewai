@@ -381,7 +381,8 @@ export const InterviewDashboard: FC = () => {
       if (isLocalhost) {
         wsUrl = `${wsProtocol}//${window.location.hostname}:3001/api/realtime-api`;
       } else {
-        wsUrl = 'wss://https://03a9-2601-c2-1b81-4e0-58ce-e8c0-5e7c-9b9.ngrok-free.app/api/realtime-api';
+        // Remove the extra 'https//' from the URL
+        wsUrl = 'wss://03a9-2601-c2-1b81-4e0-58ce-e8c0-5e7c-9b9.ngrok-free.app/api/realtime-api';
       }
 
       console.log('Attempting to connect to WebSocket:', wsUrl);
