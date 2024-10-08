@@ -9,7 +9,6 @@ export function MainNav({
   ...props
 }: React.HTMLAttributes<HTMLElement>) {
   const pathname = usePathname();
-
   return (
     <nav
       className={cn("flex items-center justify-between w-full", className)}
@@ -44,9 +43,14 @@ export function MainNav({
           Upload Info
         </Link>
       </div>
-      <Link href="/interview">
-        <Button>Interview Now</Button>
-      </Link>
+      <div className="flex items-center space-x-4">
+        <Link href="/jobapplications">
+          <Button className="bg-blue-500 hover:bg-blue-600 text-white">Apply To Jobs</Button>
+        </Link>
+        <Link href="/interview">
+          <Button>Interview Now</Button>
+        </Link>
+      </div>
     </nav>
   );
 }
