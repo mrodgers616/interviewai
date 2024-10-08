@@ -5,6 +5,7 @@
 2. node server.mjs
 3. npm run dev
 4. For running ngrok - ngrok start --config ngrok.yml websocket
+5. if using ngrok, update the wsUrl in components/interview-dashboard/interview-dashboard.tsx line 384
 
 
 
