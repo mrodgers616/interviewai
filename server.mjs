@@ -29,7 +29,7 @@ app.prepare().then(() => {
   const wss = new WebSocketServer({
     noServer: true,
     verifyClient: (info, callback) => {
-      const allowedOrigins = ['http://localhost:3000', 'http://localhost:3001', 'https://6ab0-2601-c2-1b81-4e0-e531-72e8-9f72-ef0c.ngrok-free.app'];
+      const allowedOrigins = ['http://localhost:3000', 'http://localhost:3001', 'https://03a9-2601-c2-1b81-4e0-58ce-e8c0-5e7c-9b9.ngrok-free.app'];
       if (allowedOrigins.includes(info.origin) || info.origin.endsWith('.herokuapp.com')) {
         callback(true);
       } else {

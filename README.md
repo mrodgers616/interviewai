@@ -1,6 +1,13 @@
 ### Boilerplate for React TypeScript projects using Next.js, shadcn/ui, Tailwind and Firebase on Vercel!
 
-> Now using Next.js app router!
+## Runnning
+1. npm install
+2. node server.mjs
+3. npm run dev
+4. For running ngrok - ngrok start --config ngrok.yml websocket
+
+
+
 
 This stack is 🔥 because projects can be built and deployed for free until you get to higher tiers within Vercel/Firebase which only happens once you get lots of DAUs.
 
