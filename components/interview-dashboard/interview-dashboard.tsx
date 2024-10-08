@@ -394,7 +394,6 @@ export const InterviewDashboard: FC = () => {
       ws.onopen = () => {
         console.log('Connected to server WebSocket');
         setWsStatus('open');
-        toast.success('Connected to interview server');
       };
 
       ws.onmessage = (event) => {
@@ -409,7 +408,6 @@ export const InterviewDashboard: FC = () => {
           setTranscription(prev => prev + message.data);
         } else if (message.type === 'error') {
           console.error('OpenAI API error:', message.error);
-          toast.error(`API error: ${message.error.message}`);
         } else {
           console.log('Unhandled message type:', message.type);
         }
@@ -418,13 +416,11 @@ export const InterviewDashboard: FC = () => {
       ws.onclose = (event) => {
         console.log('WebSocket closed:', event);
         setWsStatus('closed');
-        toast.error(`Disconnected from interview server (Code: ${event.code}). Attempting to reconnect...`);
         setTimeout(connectWebSocket, 5000);
       };
 
       ws.onerror = (error) => {
         console.error('WebSocket error:', error);
-        toast.error('Error connecting to interview server');
       };
     };
 
@@ -491,7 +487,6 @@ export const InterviewDashboard: FC = () => {
       console.log('Started playing audio chunk');
     }, (error) => {
       console.error('Error decoding audio data:', error);
-      toast.error('Error decoding audio');
       setIsPlaying(false);
       setAudioQueue(prevQueue => prevQueue.slice(1));
     });
