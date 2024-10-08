@@ -623,16 +623,9 @@ export const InterviewDashboard: FC = () => {
               </Card>
             </div>
             <div className="w-2/5 pl-4">
-              <div className="text-center text-lg font-semibold mb-4">
-                System Status: {systemStatus}
-              </div>
-              <div className="text-center text-sm mb-2">
-                WebSocket Status: {wsStatus}
-              </div>
               <TranscriptionDisplay
                 transcription={transcription}
                 currentQuestion={currentQuestion}
-                systemStatus={systemStatus}
               />
               <ControlButtons
                 isInterviewStarted={isInterviewStarted}
