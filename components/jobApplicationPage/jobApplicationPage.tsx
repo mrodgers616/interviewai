@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "react-hot-toast";
 import { MainNav } from "@/components/demo-dashboard/main-nav";
+import { Toaster } from 'react-hot-toast';
 
 interface Config {
   remote: boolean;
@@ -208,6 +209,10 @@ const defaultConfig: Config = {
   },
 };
 
+const splitAndTrim = (input: string) => {
+  return input.split(/,\s*/).map(item => item.trim()).filter(item => item !== '');
+};
+
 export const JobApplicationPage: FC = () => {
   const auth = useAuth();
   const db = getFirestore();
@@ -264,6 +269,7 @@ export const JobApplicationPage: FC = () => {
 
   return (
     <>
+      <Toaster position="top-right" />
       <div className="flex h-16 items-center bg-muted px-6 rounded-xl">
           <MainNav />
         </div>
@@ -297,10 +303,17 @@ export const JobApplicationPage: FC = () => {
                   Experience Level
                   {renderInfoIcon("Select the experience levels you're interested in")}
                 </h3>
-                {Object.entries(config.experienceLevel).map(([key, value]) => (
+                {[
+                  "internship",
+                  "entry",
+                  "associate",
+                  "mid-senior level",
+                  "director",
+                  "executive"
+                ].map((key) => (
                   <div key={key} className="flex items-center mb-2">
                     <Checkbox
-                      checked={value}
+                      checked={config.experienceLevel[key as keyof typeof config.experienceLevel]}
                       onCheckedChange={(checked: boolean) =>
                         setConfig({
                           ...config,
@@ -313,7 +326,7 @@ export const JobApplicationPage: FC = () => {
                       id={`experience-${key}`}
                     />
                     <label htmlFor={`experience-${key}`} className="ml-2">
-                      {key}
+                      {key.charAt(0).toUpperCase() + key.slice(1)}
                     </label>
                   </div>
                 ))}
@@ -336,7 +349,7 @@ export const JobApplicationPage: FC = () => {
                   onChange={(e) =>
                     setConfig({
                       ...config,
-                      positions: e.target.value.split(",").map((s) => s.trim()),
+                      positions: splitAndTrim(e.target.value),
                     })
                   }
                   placeholder="Enter positions separated by commas"
@@ -392,7 +405,7 @@ export const JobApplicationPage: FC = () => {
                   onChange={(e) =>
                     setConfig({
                       ...config,
-                      company_blacklist: e.target.value.split(",").map((s) => s.trim()),
+                      company_blacklist: splitAndTrim(e.target.value),
                     })
                   }
                   placeholder="Enter companies separated by commas"
@@ -410,7 +423,7 @@ export const JobApplicationPage: FC = () => {
                   onChange={(e) =>
                     setConfig({
                       ...config,
-                      title_blacklist: e.target.value.split(",").map((s) => s.trim()),
+                      title_blacklist: splitAndTrim(e.target.value),
                     })
                   }
                   placeholder="Enter titles separated by commas"
@@ -702,6 +715,16 @@ export const JobApplicationPage: FC = () => {
                       placeholder="Year of Completion"
                       className="mb-2"
                     />
+                    <Button 
+                      onClick={() => {
+                        const newEducationDetails = config.education_details.filter((_, i) => i !== index);
+                        setConfig({...config, education_details: newEducationDetails});
+                      }}
+                      className="mt-2"
+                      variant="destructive"
+                    >
+                      Delete Entry
+                    </Button>
                   </div>
                 ))}
                 <Button onClick={() => setConfig({...config, education_details: [...config.education_details, {
@@ -713,7 +736,7 @@ export const JobApplicationPage: FC = () => {
                   year_of_completion: '',
                   exam: {}
                 }]})}>
-                  Add Education
+                  {config.education_details.length > 0 ? "Add Another Education Entry" : "Add Education Entry"}
                 </Button>
               </div>
 
@@ -736,6 +759,16 @@ export const JobApplicationPage: FC = () => {
                       className="mb-2"
                     />
                     {/* Add more inputs for other experience fields */}
+                    <Button 
+                      onClick={() => {
+                        const newExperienceDetails = config.experience_details.filter((_, i) => i !== index);
+                        setConfig({...config, experience_details: newExperienceDetails});
+                      }}
+                      className="mt-2"
+                      variant="destructive"
+                    >
+                      Delete Entry
+                    </Button>
                   </div>
                 ))}
                 <Button onClick={() => setConfig({...config, experience_details: [...config.experience_details, {
@@ -747,7 +780,7 @@ export const JobApplicationPage: FC = () => {
                   key_responsibilities: [],
                   skills_acquired: []
                 }]})}>
-                  Add Experience
+                  {config.experience_details.length > 0 ? "Add Another Experience Entry" : "Add Experience Entry"}
                 </Button>
               </div>
 
@@ -762,8 +795,8 @@ export const JobApplicationPage: FC = () => {
                   onChange={(e) =>
                     setConfig({
                       ...config,
-                      projects: e.target.value.split(",").map((s) => ({
-                        name: s.trim(),
+                      projects: splitAndTrim(e.target.value).map((s) => ({
+                        name: s,
                         description: '',
                         link: ''
                       })),
@@ -784,8 +817,8 @@ export const JobApplicationPage: FC = () => {
                   onChange={(e) =>
                     setConfig({
                       ...config,
-                      achievements: e.target.value.split(",").map((s) => ({
-                        name: s.trim(),
+                      achievements: splitAndTrim(e.target.value).map((s) => ({
+                        name: s,
                         description: ''
                       })),
                     })
@@ -805,7 +838,7 @@ export const JobApplicationPage: FC = () => {
                   onChange={(e) =>
                     setConfig({
                       ...config,
-                      certifications: e.target.value.split(",").map((s) => s.trim()),
+                      certifications: splitAndTrim(e.target.value),
                     })
                   }
                   placeholder="Enter certifications separated by commas"
@@ -823,8 +856,8 @@ export const JobApplicationPage: FC = () => {
                   onChange={(e) =>
                     setConfig({
                       ...config,
-                      languages: e.target.value.split(",").map((s) => ({
-                        language: s.trim(),
+                      languages: splitAndTrim(e.target.value).map((s) => ({
+                        language: s,
                         proficiency: ''
                       })),
                     })
@@ -844,7 +877,7 @@ export const JobApplicationPage: FC = () => {
                   onChange={(e) =>
                     setConfig({
                       ...config,
-                      interests: e.target.value.split(",").map((s) => s.trim()),
+                      interests: splitAndTrim(e.target.value),
                     })
                   }
                   placeholder="Enter interests separated by commas"
