@@ -758,7 +758,68 @@ export const JobApplicationPage: FC = () => {
                       placeholder="Position"
                       className="mb-2"
                     />
-                    {/* Add more inputs for other experience fields */}
+                    <Input
+                      value={experience.company}
+                      onChange={(e) => {
+                        const newExperienceDetails = [...config.experience_details];
+                        newExperienceDetails[index].company = e.target.value;
+                        setConfig({...config, experience_details: newExperienceDetails});
+                      }}
+                      placeholder="Company"
+                      className="mb-2"
+                    />
+                    <Input
+                      value={experience.employment_period}
+                      onChange={(e) => {
+                        const newExperienceDetails = [...config.experience_details];
+                        newExperienceDetails[index].employment_period = e.target.value;
+                        setConfig({...config, experience_details: newExperienceDetails});
+                      }}
+                      placeholder="Employment Period (e.g., 06/2021 - Present)"
+                      className="mb-2"
+                    />
+                    <Input
+                      value={experience.location}
+                      onChange={(e) => {
+                        const newExperienceDetails = [...config.experience_details];
+                        newExperienceDetails[index].location = e.target.value;
+                        setConfig({...config, experience_details: newExperienceDetails});
+                      }}
+                      placeholder="Location"
+                      className="mb-2"
+                    />
+                    <Input
+                      value={experience.industry}
+                      onChange={(e) => {
+                        const newExperienceDetails = [...config.experience_details];
+                        newExperienceDetails[index].industry = e.target.value;
+                        setConfig({...config, experience_details: newExperienceDetails});
+                      }}
+                      placeholder="Industry"
+                      className="mb-2"
+                    />
+                    <h4 className="font-medium mb-1">Key Responsibilities</h4>
+                    <Input
+                      value={experience.key_responsibilities.join(", ")}
+                      onChange={(e) => {
+                        const newExperienceDetails = [...config.experience_details];
+                        newExperienceDetails[index].key_responsibilities = splitAndTrim(e.target.value);
+                        setConfig({...config, experience_details: newExperienceDetails});
+                      }}
+                      placeholder="Enter key responsibilities separated by commas"
+                      className="mb-2"
+                    />
+                    <h4 className="font-medium mb-1">Skills Acquired</h4>
+                    <Input
+                      value={experience.skills_acquired.join(", ")}
+                      onChange={(e) => {
+                        const newExperienceDetails = [...config.experience_details];
+                        newExperienceDetails[index].skills_acquired = splitAndTrim(e.target.value);
+                        setConfig({...config, experience_details: newExperienceDetails});
+                      }}
+                      placeholder="Enter skills acquired separated by commas"
+                      className="mb-2"
+                    />
                     <Button 
                       onClick={() => {
                         const newExperienceDetails = config.experience_details.filter((_, i) => i !== index);
