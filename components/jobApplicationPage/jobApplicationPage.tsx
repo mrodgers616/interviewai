@@ -23,6 +23,92 @@ interface Config {
     min_applicants: number;
     max_applicants: number;
   };
+  personal_information: {
+    name: string;
+    surname: string;
+    date_of_birth: string;
+    country: string;
+    city: string;
+    address: string;
+    zip_code: string;
+    phone_prefix: string;
+    phone: string;
+    email: string;
+    github: string;
+    linkedin: string;
+  };
+  education_details: Array<{
+    education_level: string;
+    institution: string;
+    field_of_study: string;
+    final_evaluation_grade: string;
+    start_date: string;
+    year_of_completion: string;
+    exam: Record<string, string>;
+  }>;
+  experience_details: Array<{
+    position: string;
+    company: string;
+    employment_period: string;
+    location: string;
+    industry: string;
+    key_responsibilities: string[];
+    skills_acquired: string[];
+  }>;
+  projects: Array<{
+    name: string;
+    description: string;
+    link: string;
+  }>;
+  achievements: Array<{
+    name: string;
+    description: string;
+  }>;
+  certifications: string[];
+  languages: Array<{
+    language: string;
+    proficiency: string;
+  }>;
+  interests: string[];
+  availability: {
+    notice_period: string;
+  };
+  salary_expectations: {
+    salary_range_usd: string;
+  };
+  self_identification: {
+    gender: string;
+    pronouns: string;
+    veteran: string;
+    disability: string;
+    ethnicity: string;
+  };
+  legal_authorization: {
+    eu_work_authorization: string;
+    us_work_authorization: string;
+    requires_us_visa: string;
+    requires_us_sponsorship: string;
+    requires_eu_visa: string;
+    legally_allowed_to_work_in_eu: string;
+    legally_allowed_to_work_in_us: string;
+    requires_eu_sponsorship: string;
+    canada_work_authorization: string;
+    requires_canada_visa: string;
+    legally_allowed_to_work_in_canada: string;
+    requires_canada_sponsorship: string;
+    uk_work_authorization: string;
+    requires_uk_visa: string;
+    legally_allowed_to_work_in_uk: string;
+    requires_uk_sponsorship: string;
+  };
+  work_preferences: {
+    remote_work: string;
+    in_person_work: string;
+    open_to_relocation: string;
+    willing_to_complete_assessments: string;
+    willing_to_undergo_drug_tests: string;
+    willing_to_undergo_background_checks: string;
+  };
 }
 
 const defaultConfig: Config = {
@@ -59,6 +145,66 @@ const defaultConfig: Config = {
   job_applicants_threshold: {
     min_applicants: 0,
     max_applicants: 0,
+  },
+  personal_information: {
+    name: "",
+    surname: "",
+    date_of_birth: "",
+    country: "",
+    city: "",
+    address: "",
+    zip_code: "",
+    phone_prefix: "",
+    phone: "",
+    email: "",
+    github: "",
+    linkedin: "",
+  },
+  education_details: [],
+  experience_details: [],
+  projects: [],
+  achievements: [],
+  certifications: [],
+  languages: [],
+  interests: [],
+  availability: {
+    notice_period: "",
+  },
+  salary_expectations: {
+    salary_range_usd: "",
+  },
+  self_identification: {
+    gender: "",
+    pronouns: "",
+    veteran: "",
+    disability: "",
+    ethnicity: "",
+  },
+  legal_authorization: {
+    eu_work_authorization: "",
+    us_work_authorization: "",
+    requires_us_visa: "",
+    requires_us_sponsorship: "",
+    requires_eu_visa: "",
+    legally_allowed_to_work_in_eu: "",
+    legally_allowed_to_work_in_us: "",
+    requires_eu_sponsorship: "",
+    canada_work_authorization: "",
+    requires_canada_visa: "",
+    legally_allowed_to_work_in_canada: "",
+    requires_canada_sponsorship: "",
+    uk_work_authorization: "",
+    requires_uk_visa: "",
+    legally_allowed_to_work_in_uk: "",
+    requires_uk_sponsorship: "",
+  },
+  work_preferences: {
+    remote_work: "",
+    in_person_work: "",
+    open_to_relocation: "",
+    willing_to_complete_assessments: "",
+    willing_to_undergo_drug_tests: "",
+    willing_to_undergo_background_checks: "",
   },
 };
 
@@ -103,6 +249,19 @@ export const JobApplicationPage: FC = () => {
     }
   };
 
+  const renderInfoIcon = (tooltip: string) => (
+    <span className="ml-1 group relative">
+      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="cursor-help">
+        <circle cx="12" cy="12" r="10"></circle>
+        <line x1="12" y1="16" x2="12" y2="12"></line>
+        <line x1="12" y1="8" x2="12.01" y2="8"></line>
+      </svg>
+      <span className="absolute bottom-full left-0 bg-gray-800 text-white text-xs rounded py-1 px-2 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+        {tooltip}
+      </span>
+    </span>
+  );
+
   return (
     <>
       <div className="flex h-16 items-center bg-muted px-6 rounded-xl">
@@ -127,16 +286,7 @@ export const JobApplicationPage: FC = () => {
                   />
                   <label htmlFor="remote" className="ml-2 flex items-center">
                     Remote
-                    <span className="ml-1 group relative">
-                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="cursor-help">
-                        <circle cx="12" cy="12" r="10"></circle>
-                        <line x1="12" y1="16" x2="12" y2="12"></line>
-                        <line x1="12" y1="8" x2="12.01" y2="8"></line>
-                      </svg>
-                      <span className="absolute bottom-full left-0 bg-gray-800 text-white text-xs rounded py-1 px-2 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                        Only show remote job opportunities
-                      </span>
-                    </span>
+                    {renderInfoIcon("Only show remote job opportunities")}
                   </label>
                 </div>
               </div>
@@ -145,16 +295,7 @@ export const JobApplicationPage: FC = () => {
               <div className="mb-4">
                 <h3 className="text-lg font-semibold mb-2 flex items-center">
                   Experience Level
-                  <span className="ml-1 group relative">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="cursor-help">
-                      <circle cx="12" cy="12" r="10"></circle>
-                      <line x1="12" y1="16" x2="12" y2="12"></line>
-                      <line x1="12" y1="8" x2="12.01" y2="8"></line>
-                    </svg>
-                    <span className="absolute bottom-full left-0 bg-gray-800 text-white text-xs rounded py-1 px-2 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                      Select the experience levels you're interested in
-                    </span>
-                  </span>
+                  {renderInfoIcon("Select the experience levels you're interested in")}
                 </h3>
                 {Object.entries(config.experienceLevel).map(([key, value]) => (
                   <div key={key} className="flex items-center mb-2">
@@ -188,16 +329,7 @@ export const JobApplicationPage: FC = () => {
               <div className="mb-4">
                 <h3 className="text-lg font-semibold mb-2 flex items-center">
                   Positions
-                  <span className="ml-1 group relative">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="cursor-help">
-                      <circle cx="12" cy="12" r="10"></circle>
-                      <line x1="12" y1="16" x2="12" y2="12"></line>
-                      <line x1="12" y1="8" x2="12.01" y2="8"></line>
-                    </svg>
-                    <span className="absolute bottom-full left-0 bg-gray-800 text-white text-xs rounded py-1 px-2 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                      Enter job positions you're interested in, separated by commas
-                    </span>
-                  </span>
+                  {renderInfoIcon("Enter job positions you're interested in, separated by commas")}
                 </h3>
                 <Input
                   value={config.positions.join(", ")}
@@ -226,16 +358,7 @@ export const JobApplicationPage: FC = () => {
                   />
                   <label htmlFor="apply_once_at_company" className="ml-2 flex items-center">
                     Apply once at company
-                    <span className="ml-1 group relative">
-                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="cursor-help">
-                        <circle cx="12" cy="12" r="10"></circle>
-                        <line x1="12" y1="16" x2="12" y2="12"></line>
-                        <line x1="12" y1="8" x2="12.01" y2="8"></line>
-                      </svg>
-                      <span className="absolute bottom-full right-0 bg-gray-800 text-white text-xs rounded py-1 px-2 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                        Only apply once to each company, even if they have multiple job openings
-                      </span>
-                    </span>
+                    {renderInfoIcon("Only apply once to each company, even if they have multiple job openings")}
                   </label>
                 </div>
               </div>
@@ -244,16 +367,7 @@ export const JobApplicationPage: FC = () => {
               <div className="mb-4">
                 <h3 className="text-lg font-semibold mb-2 flex items-center">
                   Distance
-                  <span className="ml-1 group relative">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="cursor-help">
-                      <circle cx="12" cy="12" r="10"></circle>
-                      <line x1="12" y1="16" x2="12" y2="12"></line>
-                      <line x1="12" y1="8" x2="12.01" y2="8"></line>
-                    </svg>
-                    <span className="absolute bottom-full right-0 bg-gray-800 text-white text-xs rounded py-1 px-2 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                      Maximum distance in miles from your location
-                    </span>
-                  </span>
+                  {renderInfoIcon("Maximum distance in miles from your location")}
                 </h3>
                 <Input
                   value={config.distance.toString()}
@@ -271,16 +385,7 @@ export const JobApplicationPage: FC = () => {
               <div className="mb-4">
                 <h3 className="text-lg font-semibold mb-2 flex items-center">
                   Company Blacklist
-                  <span className="ml-1 group relative">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="cursor-help">
-                      <circle cx="12" cy="12" r="10"></circle>
-                      <line x1="12" y1="16" x2="12" y2="12"></line>
-                      <line x1="12" y1="8" x2="12.01" y2="8"></line>
-                    </svg>
-                    <span className="absolute bottom-full right-0 bg-gray-800 text-white text-xs rounded py-1 px-2 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                      Companies to exclude from your job search
-                    </span>
-                  </span>
+                  {renderInfoIcon("Companies to exclude from your job search")}
                 </h3>
                 <Input
                   value={config.company_blacklist.join(", ")}
@@ -298,16 +403,7 @@ export const JobApplicationPage: FC = () => {
               <div className="mb-4">
                 <h3 className="text-lg font-semibold mb-2 flex items-center">
                   Title Blacklist
-                  <span className="ml-1 group relative">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="cursor-help">
-                      <circle cx="12" cy="12" r="10"></circle>
-                      <line x1="12" y1="16" x2="12" y2="12"></line>
-                      <line x1="12" y1="8" x2="12.01" y2="8"></line>
-                    </svg>
-                    <span className="absolute bottom-full right-0 bg-gray-800 text-white text-xs rounded py-1 px-2 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                      Job titles to exclude from your search
-                    </span>
-                  </span>
+                  {renderInfoIcon("Job titles to exclude from your search")}
                 </h3>
                 <Input
                   value={config.title_blacklist.join(", ")}
@@ -325,16 +421,7 @@ export const JobApplicationPage: FC = () => {
               <div className="mb-4">
                 <h3 className="text-lg font-semibold mb-2 flex items-center">
                   Job Applicants Threshold
-                  <span className="ml-1 group relative">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="cursor-help">
-                      <circle cx="12" cy="12" r="10"></circle>
-                      <line x1="12" y1="16" x2="12" y2="12"></line>
-                      <line x1="12" y1="8" x2="12.01" y2="8"></line>
-                    </svg>
-                    <span className="absolute bottom-full right-0 bg-gray-800 text-white text-xs rounded py-1 px-2 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                      Range of acceptable number of applicants for a job
-                    </span>
-                  </span>
+                  {renderInfoIcon("Range of acceptable number of applicants for a job")}
                 </h3>
                 <div className="flex items-center mb-2">
                   <Input
@@ -365,6 +452,590 @@ export const JobApplicationPage: FC = () => {
                     placeholder="Enter maximum applicants"
                   />
                 </div>
+              </div>
+
+              {/* Personal Information */}
+              <div className="mb-4">
+                <h3 className="text-lg font-semibold mb-2 flex items-center">
+                  Personal Information
+                  {renderInfoIcon("Basic personal details to identify yourself and provide contact information")}
+                </h3>
+                <Input
+                  value={config.personal_information.name}
+                  onChange={(e) =>
+                    setConfig({
+                      ...config,
+                      personal_information: {
+                        ...config.personal_information,
+                        name: e.target.value,
+                      },
+                    })
+                  }
+                  placeholder="First Name"
+                  className="mb-2"
+                />
+                <Input
+                  value={config.personal_information.surname}
+                  onChange={(e) =>
+                    setConfig({
+                      ...config,
+                      personal_information: {
+                        ...config.personal_information,
+                        surname: e.target.value,
+                      },
+                    })
+                  }
+                  placeholder="Last Name"
+                  className="mb-2"
+                />
+                <h4 className="text-sm font-medium mb-1">Date of Birth</h4>
+                <Input
+                  value={config.personal_information.date_of_birth}
+                  onChange={(e) =>
+                    setConfig({
+                      ...config,
+                      personal_information: {
+                        ...config.personal_information,
+                        date_of_birth: e.target.value,
+                      },
+                    })
+                  }
+                  placeholder="Date of Birth"
+                  className="mb-2"
+                  type="date"
+                />
+                <Input
+                  value={config.personal_information.country}
+                  onChange={(e) =>
+                    setConfig({
+                      ...config,
+                      personal_information: {
+                        ...config.personal_information,
+                        country: e.target.value,
+                      },
+                    })
+                  }
+                  placeholder="Country"
+                  className="mb-2"
+                />
+                <Input
+                  value={config.personal_information.city}
+                  onChange={(e) =>
+                    setConfig({
+                      ...config,
+                      personal_information: {
+                        ...config.personal_information,
+                        city: e.target.value,
+                      },
+                    })
+                  }
+                  placeholder="City"
+                  className="mb-2"
+                />
+                <Input
+                  value={config.personal_information.address}
+                  onChange={(e) =>
+                    setConfig({
+                      ...config,
+                      personal_information: {
+                        ...config.personal_information,
+                        address: e.target.value,
+                      },
+                    })
+                  }
+                  placeholder="Address"
+                  className="mb-2"
+                />
+                <Input
+                  value={config.personal_information.zip_code}
+                  onChange={(e) =>
+                    setConfig({
+                      ...config,
+                      personal_information: {
+                        ...config.personal_information,
+                        zip_code: e.target.value,
+                      },
+                    })
+                  }
+                  placeholder="Zip Code"
+                  className="mb-2"
+                />
+                <Input
+                  value={config.personal_information.phone_prefix}
+                  onChange={(e) =>
+                    setConfig({
+                      ...config,
+                      personal_information: {
+                        ...config.personal_information,
+                        phone_prefix: e.target.value,
+                      },
+                    })
+                  }
+                  placeholder="Phone Prefix"
+                  className="mb-2"
+                />
+                <Input
+                  value={config.personal_information.phone}
+                  onChange={(e) =>
+                    setConfig({
+                      ...config,
+                      personal_information: {
+                        ...config.personal_information,
+                        phone: e.target.value,
+                      },
+                    })
+                  }
+                  placeholder="Phone Number"
+                  className="mb-2"
+                />
+                <Input
+                  value={config.personal_information.email}
+                  onChange={(e) =>
+                    setConfig({
+                      ...config,
+                      personal_information: {
+                        ...config.personal_information,
+                        email: e.target.value,
+                      },
+                    })
+                  }
+                  placeholder="Email"
+                  className="mb-2"
+                  type="email"
+                />
+                <Input
+                  value={config.personal_information.github}
+                  onChange={(e) =>
+                    setConfig({
+                      ...config,
+                      personal_information: {
+                        ...config.personal_information,
+                        github: e.target.value,
+                      },
+                    })
+                  }
+                  placeholder="GitHub Profile"
+                  className="mb-2"
+                />
+                <Input
+                  value={config.personal_information.linkedin}
+                  onChange={(e) =>
+                    setConfig({
+                      ...config,
+                      personal_information: {
+                        ...config.personal_information,
+                        linkedin: e.target.value,
+                      },
+                    })
+                  }
+                  placeholder="LinkedIn Profile"
+                  className="mb-2"
+                />
+              </div>
+
+              {/* Education Details */}
+              <div className="mb-4">
+                <h3 className="text-lg font-semibold mb-2 flex items-center">
+                  Education Details
+                  {renderInfoIcon("Your academic background, including degrees earned and relevant coursework")}
+                </h3>
+                {config.education_details.map((education, index) => (
+                  <div key={index} className="mb-4 p-4 border rounded">
+                    <Input
+                      value={education.education_level}
+                      onChange={(e) => {
+                        const newEducationDetails = [...config.education_details];
+                        newEducationDetails[index].education_level = e.target.value;
+                        setConfig({...config, education_details: newEducationDetails});
+                      }}
+                      placeholder="Education Level"
+                      className="mb-2"
+                    />
+                    <Input
+                      value={education.institution}
+                      onChange={(e) => {
+                        const newEducationDetails = [...config.education_details];
+                        newEducationDetails[index].institution = e.target.value;
+                        setConfig({...config, education_details: newEducationDetails});
+                      }}
+                      placeholder="Institution"
+                      className="mb-2"
+                    />
+                    <Input
+                      value={education.field_of_study}
+                      onChange={(e) => {
+                        const newEducationDetails = [...config.education_details];
+                        newEducationDetails[index].field_of_study = e.target.value;
+                        setConfig({...config, education_details: newEducationDetails});
+                      }}
+                      placeholder="Field of Study"
+                      className="mb-2"
+                    />
+                    <Input
+                      value={education.final_evaluation_grade}
+                      onChange={(e) => {
+                        const newEducationDetails = [...config.education_details];
+                        newEducationDetails[index].final_evaluation_grade = e.target.value;
+                        setConfig({...config, education_details: newEducationDetails});
+                      }}
+                      placeholder="Final Evaluation Grade"
+                      className="mb-2"
+                    />
+                    <Input
+                      value={education.start_date}
+                      onChange={(e) => {
+                        const newEducationDetails = [...config.education_details];
+                        newEducationDetails[index].start_date = e.target.value;
+                        setConfig({...config, education_details: newEducationDetails});
+                      }}
+                      placeholder="Start Date"
+                      className="mb-2"
+                      type="date"
+                    />
+                    <Input
+                      value={education.year_of_completion}
+                      onChange={(e) => {
+                        const newEducationDetails = [...config.education_details];
+                        newEducationDetails[index].year_of_completion = e.target.value;
+                        setConfig({...config, education_details: newEducationDetails});
+                      }}
+                      placeholder="Year of Completion"
+                      className="mb-2"
+                    />
+                  </div>
+                ))}
+                <Button onClick={() => setConfig({...config, education_details: [...config.education_details, {
+                  education_level: '',
+                  institution: '',
+                  field_of_study: '',
+                  final_evaluation_grade: '',
+                  start_date: '',
+                  year_of_completion: '',
+                  exam: {}
+                }]})}>
+                  Add Education
+                </Button>
+              </div>
+
+              {/* Experience Details */}
+              <div className="mb-4">
+                <h3 className="text-lg font-semibold mb-2 flex items-center">
+                  Experience Details
+                  {renderInfoIcon("Your work experience, including job roles, companies, and key responsibilities")}
+                </h3>
+                {config.experience_details.map((experience, index) => (
+                  <div key={index} className="mb-4 p-4 border rounded">
+                    <Input
+                      value={experience.position}
+                      onChange={(e) => {
+                        const newExperienceDetails = [...config.experience_details];
+                        newExperienceDetails[index].position = e.target.value;
+                        setConfig({...config, experience_details: newExperienceDetails});
+                      }}
+                      placeholder="Position"
+                      className="mb-2"
+                    />
+                    {/* Add more inputs for other experience fields */}
+                  </div>
+                ))}
+                <Button onClick={() => setConfig({...config, experience_details: [...config.experience_details, {
+                  position: '',
+                  company: '',
+                  employment_period: '',
+                  location: '',
+                  industry: '',
+                  key_responsibilities: [],
+                  skills_acquired: []
+                }]})}>
+                  Add Experience
+                </Button>
+              </div>
+
+              {/* Projects */}
+              <div className="mb-4">
+                <h3 className="text-lg font-semibold mb-2 flex items-center">
+                  Projects
+                  {renderInfoIcon("Notable projects you have worked on, including personal or professional projects")}
+                </h3>
+                <Input
+                  value={config.projects.map(project => project.name).join(", ")}
+                  onChange={(e) =>
+                    setConfig({
+                      ...config,
+                      projects: e.target.value.split(",").map((s) => ({
+                        name: s.trim(),
+                        description: '',
+                        link: ''
+                      })),
+                    })
+                  }
+                  placeholder="Enter projects separated by commas"
+                />
+              </div>
+
+              {/* Achievements */}
+              <div className="mb-4">
+                <h3 className="text-lg font-semibold mb-2 flex items-center">
+                  Achievements
+                  {renderInfoIcon("Notable accomplishments or awards you have received")}
+                </h3>
+                <Input
+                  value={config.achievements.map(achievement => achievement.name).join(", ")}
+                  onChange={(e) =>
+                    setConfig({
+                      ...config,
+                      achievements: e.target.value.split(",").map((s) => ({
+                        name: s.trim(),
+                        description: ''
+                      })),
+                    })
+                  }
+                  placeholder="Enter achievements separated by commas"
+                />
+              </div>
+
+              {/* Certifications */}
+              <div className="mb-4">
+                <h3 className="text-lg font-semibold mb-2 flex items-center">
+                  Certifications
+                  {renderInfoIcon("Professional certifications you have earned")}
+                </h3>
+                <Input
+                  value={config.certifications.join(", ")}
+                  onChange={(e) =>
+                    setConfig({
+                      ...config,
+                      certifications: e.target.value.split(",").map((s) => s.trim()),
+                    })
+                  }
+                  placeholder="Enter certifications separated by commas"
+                />
+              </div>
+
+              {/* Languages */}
+              <div className="mb-4">
+                <h3 className="text-lg font-semibold mb-2 flex items-center">
+                  Languages
+                  {renderInfoIcon("Languages you speak and your proficiency level in each")}
+                </h3>
+                <Input
+                  value={config.languages.map(lang => lang.language).join(", ")}
+                  onChange={(e) =>
+                    setConfig({
+                      ...config,
+                      languages: e.target.value.split(",").map((s) => ({
+                        language: s.trim(),
+                        proficiency: ''
+                      })),
+                    })
+                  }
+                  placeholder="Enter languages separated by commas"
+                />
+              </div>
+
+              {/* Interests */}
+              <div className="mb-4">
+                <h3 className="text-lg font-semibold mb-2 flex items-center">
+                  Interests
+                  {renderInfoIcon("Professional or personal interests that may be relevant to your career")}
+                </h3>
+                <Input
+                  value={config.interests.join(", ")}
+                  onChange={(e) =>
+                    setConfig({
+                      ...config,
+                      interests: e.target.value.split(",").map((s) => s.trim()),
+                    })
+                  }
+                  placeholder="Enter interests separated by commas"
+                />
+              </div>
+
+              {/* Availability */}
+              <div className="mb-4">
+                <h3 className="text-lg font-semibold mb-2 flex items-center">
+                  Availability
+                  {renderInfoIcon("Your current availability or notice period")}
+                </h3>
+                <Input
+                  value={config.availability.notice_period}
+                  onChange={(e) =>
+                    setConfig({
+                      ...config,
+                      availability: {
+                        ...config.availability,
+                        notice_period: e.target.value,
+                      },
+                    })
+                  }
+                  placeholder="Notice Period (e.g., 2 weeks)"
+                />
+              </div>
+
+              {/* Salary Expectations */}
+              <div className="mb-4">
+                <h3 className="text-lg font-semibold mb-2 flex items-center">
+                  Salary Expectations
+                  {renderInfoIcon("Your expected salary range")}
+                </h3>
+                <Input
+                  value={config.salary_expectations.salary_range_usd}
+                  onChange={(e) =>
+                    setConfig({
+                      ...config,
+                      salary_expectations: {
+                        ...config.salary_expectations,
+                        salary_range_usd: e.target.value,
+                      },
+                    })
+                  }
+                  placeholder="Salary Range (USD)"
+                />
+              </div>
+
+              {/* Self Identification */}
+              <div className="mb-4">
+                <h3 className="text-lg font-semibold mb-2 flex items-center">
+                  Self Identification
+                  {renderInfoIcon("Information related to personal identity, including gender and pronouns")}
+                </h3>
+                <Input
+                  value={config.self_identification.gender}
+                  onChange={(e) =>
+                    setConfig({
+                      ...config,
+                      self_identification: {
+                        ...config.self_identification,
+                        gender: e.target.value,
+                      },
+                    })
+                  }
+                  placeholder="Gender"
+                  className="mb-2"
+                />
+                <Input
+                  value={config.self_identification.pronouns}
+                  onChange={(e) =>
+                    setConfig({
+                      ...config,
+                      self_identification: {
+                        ...config.self_identification,
+                        pronouns: e.target.value,
+                      },
+                    })
+                  }
+                  placeholder="Pronouns"
+                  className="mb-2"
+                />
+                <Input
+                  value={config.self_identification.veteran}
+                  onChange={(e) =>
+                    setConfig({
+                      ...config,
+                      self_identification: {
+                        ...config.self_identification,
+                        veteran: e.target.value,
+                      },
+                    })
+                  }
+                  placeholder="Veteran Status"
+                  className="mb-2"
+                />
+                <Input
+                  value={config.self_identification.disability}
+                  onChange={(e) =>
+                    setConfig({
+                      ...config,
+                      self_identification: {
+                        ...config.self_identification,
+                        disability: e.target.value,
+                      },
+                    })
+                  }
+                  placeholder="Disability Status"
+                  className="mb-2"
+                />
+                <Input
+                  value={config.self_identification.ethnicity}
+                  onChange={(e) =>
+                    setConfig({
+                      ...config,
+                      self_identification: {
+                        ...config.self_identification,
+                        ethnicity: e.target.value,
+                      },
+                    })
+                  }
+                  placeholder="Ethnicity"
+                  className="mb-2"
+                />
+              </div>
+
+              {/* Legal Authorization */}
+              <div className="mb-4">
+                <h3 className="text-lg font-semibold mb-2 flex items-center">
+                  Legal Authorization
+                  {renderInfoIcon("Your legal ability to work in various locations")}
+                </h3>
+                {[
+                  { country: "USA", fields: ["us_work_authorization", "requires_us_visa", "requires_us_sponsorship", "legally_allowed_to_work_in_us"] },
+                  { country: "EU", fields: ["eu_work_authorization", "requires_eu_visa", "requires_eu_sponsorship", "legally_allowed_to_work_in_eu"] },
+                  { country: "CANADA", fields: ["canada_work_authorization", "requires_canada_visa", "requires_canada_sponsorship", "legally_allowed_to_work_in_canada"] },
+                  { country: "UK", fields: ["uk_work_authorization", "requires_uk_visa", "requires_uk_sponsorship", "legally_allowed_to_work_in_uk"] },
+                ].map(({ country, fields }) => (
+                  <div key={country} className="mb-4">
+                    <h4 className="font-medium mb-2">{country}</h4>
+                    {fields.map((key) => (
+                      <div key={key} className="flex items-center mb-2">
+                        <Checkbox
+                          checked={config.legal_authorization[key as keyof typeof config.legal_authorization] === "Yes"}
+                          onCheckedChange={(checked) =>
+                            setConfig({
+                              ...config,
+                              legal_authorization: {
+                                ...config.legal_authorization,
+                                [key]: checked ? "Yes" : "No",
+                              },
+                            })
+                          }
+                          id={`legal-${key}`}
+                        />
+                        <label htmlFor={`legal-${key}`} className="ml-2 flex items-center">
+                          {key.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')}
+                          {key.includes("work_authorization") && renderInfoIcon("Work authorization is the legal right to work in a specific country")}
+                        </label>
+                      </div>
+                    ))}
+                  </div>
+                ))}
+              </div>
+
+              {/* Work Preferences */}
+              <div className="mb-4">
+                <h3 className="text-lg font-semibold mb-2 flex items-center">
+                  Work Preferences
+                  {renderInfoIcon("Your preferences for work arrangements and conditions")}
+                </h3>
+                {Object.entries(config.work_preferences).map(([key, value]) => (
+                  <div key={key} className="flex items-center mb-2">
+                    <Checkbox
+                      checked={value === "Yes"}
+                      onCheckedChange={(checked) =>
+                        setConfig({
+                          ...config,
+                          work_preferences: {
+                            ...config.work_preferences,
+                            [key]: checked ? "Yes" : "No",
+                          },
+                        })
+                      }
+                      id={`preference-${key}`}
+                    />
+                    <label htmlFor={`preference-${key}`} className="ml-2">
+                      {key.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')}
+                    </label>
+                  </div>
+                ))}
               </div>
 
               <Button type="submit" className="mt-4">
