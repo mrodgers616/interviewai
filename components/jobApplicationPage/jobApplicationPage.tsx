@@ -60,7 +60,7 @@ interface Config {
     name: string;
     description: string;
     link: string;
-  }>;
+  }>; 
   achievements: Array<{
     name: string;
     description: string;
