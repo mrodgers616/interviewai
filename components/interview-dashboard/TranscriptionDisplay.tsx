@@ -9,7 +9,7 @@ interface TranscriptionDisplayProps {
 export const TranscriptionDisplay: React.FC<TranscriptionDisplayProps> = ({
   transcription,
   currentQuestion,
-  systemStatus
+  systemStatus 
 }) => {
   return (
     <div className="mt-4 p-4 bg-gray-100 rounded-lg">
