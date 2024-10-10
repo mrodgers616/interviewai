@@ -1104,7 +1104,12 @@ export const JobApplicationPage: FC = () => {
                           id={`legal-${key}`}
                         />
                         <label htmlFor={`legal-${key}`} className="ml-2 flex items-center">
-                          {key.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')}
+                          {key.split('_').map(word => {
+                            if (word.toUpperCase() === "US" || word.toUpperCase() === "EU" || word.toUpperCase() === "UK") {
+                              return word.toUpperCase();
+                            }
+                            return word.charAt(0).toUpperCase() + word.slice(1);
+                          }).join(' ')}
                           {key.includes("work_authorization") && renderInfoIcon("Work authorization is the legal right to work in a specific country")}
                         </label>
                       </div>
