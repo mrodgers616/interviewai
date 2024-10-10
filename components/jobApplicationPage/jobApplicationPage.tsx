@@ -271,13 +271,15 @@ export const JobApplicationPage: FC = () => {
   return (
     <>
       <Toaster position="top-right" />
-      <div className="flex h-16 items-center bg-muted px-6 rounded-xl">
+      <div className="container mx-auto py-8 border-t">
+      <h1 className="text-3xl font-bold mb-6">Upload Configuration</h1>
+      <div className="flex h-16 items-center bg-muted px-6 rounded-xl mb-6">
           <MainNav />
-        </div>
+      </div>
       <div className="container mx-auto px-4 py-8">
         <Card>
           <CardHeader>
-            <CardTitle>Upload Configuration</CardTitle>
+            <CardTitle>Fill in below</CardTitle>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit}>
@@ -1146,6 +1148,7 @@ export const JobApplicationPage: FC = () => {
           </CardContent>
         </Card>
       </div>
+    </div>
     </>
   );
 };
