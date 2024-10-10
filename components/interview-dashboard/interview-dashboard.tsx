@@ -583,14 +583,11 @@ export const InterviewDashboard: FC = () => {
         />
       </div>
       <div className="hidden flex-col md:flex">
-        <div className="flex items-center justify-between space-y-2 mb-6">
-          <h2 className="text-3xl leading-5 font-bold tracking-tight">
-            {isInterviewStarted ? "Interview in Progress" : "Start Interview"}
-          </h2>
-        </div>
-        <div className="flex h-16 items-center bg-muted px-6 rounded-xl">
+        <div className="container mx-auto py-8 border-t">
+      <h1 className="text-3xl font-bold mb-6">Interview</h1>
+      <div className="flex h-16 items-center bg-muted px-6 rounded-xl mb-6">
           <MainNav />
-        </div>
+      </div>
         <div className="flex-1 space-y-4 pt-6">
           <div className="flex">
             <div className="w-3/5 pr-4">
@@ -642,6 +639,7 @@ export const InterviewDashboard: FC = () => {
             </div>
           </div>
         </div>
+      </div>
       </div>
     </>
   );
